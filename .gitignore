@@ -7,3 +7,7 @@ pnpm-debug.log*
 coverage
 playwright-report
 test-results
+node_modules/
+/dist/
+/coverage/
+/.playwright/

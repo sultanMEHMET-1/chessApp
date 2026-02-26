@@ -13,4 +13,10 @@ export default defineConfig({
     url: DEV_SERVER_URL,
     reuseExistingServer: !process.env.CI
   }
+import { defineConfig } from '@playwright/test';
+
+const TEST_DIRECTORY = 'e2e';
+
+export default defineConfig({
+  testDir: TEST_DIRECTORY
 });
