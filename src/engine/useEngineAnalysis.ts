@@ -93,6 +93,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
     workerRef.current.terminate();
     workerRef.current = null;
     setIsReady(false);
+    activeRequestRef.current = null;
   }, [sendMessage]);
 
   useEffect(() => {
@@ -106,6 +107,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
     if (!enabled) {
       dispatch({ type: 'reset' });
       sendMessage({ type: 'stop', version: ENGINE_PROTOCOL_VERSION });
+      activeRequestRef.current = null;
       return;
     }
 
