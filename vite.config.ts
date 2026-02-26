@@ -1,12 +1,11 @@
-import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+const DEV_SERVER_PORT = 5173; // Vite default.
 
 export default defineConfig({
   plugins: [react()],
-  test: {
-    environment: "jsdom",
-    setupFiles: "./src/test/setup.ts",
-    css: true,
-    exclude: ["e2e/**", "node_modules/**"]
+  server: {
+    port: DEV_SERVER_PORT
   }
 });

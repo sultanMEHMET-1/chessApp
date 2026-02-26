@@ -1,0 +1,61 @@
+.panel {
+  display: grid;
+  gap: 12px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.controlButton {
+  border: 1px solid rgba(156, 122, 82, 0.4);
+  background: #f6e8d1;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.select,
+.input {
+  border: 1px solid rgba(156, 122, 82, 0.4);
+  border-radius: 8px;
+  padding: 4px 6px;
+  font-size: 13px;
+}
+
+.lineList {
+  display: grid;
+  gap: 10px;
+}
+
+.lineItem {
+  background: #fff8ee;
+  border-radius: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(156, 122, 82, 0.25);
+}
+
+.lineHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3a2c1f;
+}
+
+.linePv {
+  font-size: 12px;
+  color: #5a4937;
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+.error {
+  color: #8b3e24;
+  font-size: 13px;
+}
