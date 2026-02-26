@@ -1,40 +1,43 @@
 # Chess App
 
-Scaffold for a React + TypeScript + Vite chess application.
+A React + TypeScript chess UI backed by chess.js for move legality and a Stockfish (WASM) analysis worker.
 
 ## Install And Run
 Requires Node.js 20+ and pnpm.
 
-- `pnpm install`
-- `pnpm dev`
+1. `pnpm install`
+2. `pnpm dev`
 
 ## Scripts
 - `pnpm dev` starts the Vite dev server.
 - `pnpm build` runs typecheck and builds for production.
 - `pnpm preview` serves the production build locally.
-- `pnpm test` runs unit tests once with Vitest.
-- `pnpm test:watch` runs unit tests in watch mode.
-- `pnpm e2e` runs Playwright smoke tests.
+- `pnpm test` runs unit + integration tests once with Vitest.
+- `pnpm test:watch` runs Vitest in watch mode.
+- `pnpm e2e` runs the Playwright smoke suite.
 - `pnpm e2e:ui` opens Playwright UI mode.
 
 ## Tests
-Run unit tests with `pnpm test` (Vitest). Run the Playwright smoke suite with `pnpm e2e`.
+- Unit + integration (Vitest): `pnpm test`
+- Playwright smoke suite: `pnpm e2e`
 
 ## Engine Integration (High Level)
-Stockfish will run in a dedicated Web Worker using UCI. The worker will accept typed, versioned messages for analysis requests (depth, time, or nodes), return MultiPV lines (top 3), and include a request id so stale responses can be discarded when the position changes.
+- Stockfish runs in a dedicated Web Worker using UCI.
+- The UI requests analysis with explicit settings (depth/time/nodes) and MultiPV set to 3.
+- Each analysis request is tagged with an ID so stale results are discarded when the position changes.
 
 ## Known Limitations
-- Chess UI and engine worker are not yet implemented.
-- E2E smoke coverage is limited to the app shell until the board UI exists.
+- Promotion defaults to queen; underpromotion selection will be added in a later issue.
+- The position editor validates FEN using chess.js rules, so analysis-only illegal setups are limited to what FEN validation allows.
+- E2E coverage is currently a small smoke suite.
 
 ## Dependency Notes
 Versions are pinned in `package.json` to keep builds reproducible.
 
 - `chess.js`: rules engine for legal move generation and position state.
+- `stockfish`: WebAssembly chess engine for analysis.
 - `react`, `react-dom`: UI rendering and component model.
-- `vite`, `@vitejs/plugin-react`: fast dev server and optimized build pipeline.
-- `typescript`: typed application code and config.
+- `vite`, `@vitejs/plugin-react`: dev server and build pipeline.
 - `vitest`, `jsdom`: unit test runner and DOM test environment.
-- `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`: user-focused component testing helpers.
+- `@testing-library/*`: user-focused component testing helpers.
 - `@playwright/test`: end-to-end smoke testing.
-- `@types/react`, `@types/react-dom`: TypeScript typings for React.

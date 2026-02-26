@@ -1,0 +1,67 @@
+.panel {
+  display: grid;
+  gap: 12px;
+  --palette-min-size: 60px;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--palette-min-size), 1fr));
+  gap: 8px;
+}
+
+.paletteButton {
+  border: 1px solid rgba(156, 122, 82, 0.4);
+  background: #f6e8d1;
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.paletteButtonActive {
+  background: #f1d9a8;
+  font-weight: 600;
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.fieldRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.input {
+  border: 1px solid rgba(156, 122, 82, 0.4);
+  border-radius: 8px;
+  padding: 4px 6px;
+  font-size: 13px;
+}
+
+.applyButton {
+  border: 1px solid rgba(156, 122, 82, 0.4);
+  background: #f6e8d1;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.error {
+  color: #8b3e24;
+  font-size: 13px;
+}

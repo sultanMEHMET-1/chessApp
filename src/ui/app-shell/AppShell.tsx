@@ -19,9 +19,6 @@ export function AppShell() {
       <main className={styles.main}>
         <section className={styles.boardCard} aria-label="Board area">
           <Board />
-          <div className={styles.mainMeta}>
-            Move list, clocks, and controls will live in this space.
-          </div>
         </section>
       </main>
 
