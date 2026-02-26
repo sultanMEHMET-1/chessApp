@@ -1,0 +1,50 @@
+.panel {
+  display: grid;
+  gap: 12px;
+  --history-control-count: 4;
+  --history-max-height: 220px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(var(--history-control-count), minmax(0, 1fr));
+  gap: 8px;
+}
+
+.controlButton {
+  border: 1px solid rgba(156, 122, 82, 0.4);
+  background: #f6e8d1;
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.controlButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.moveList {
+  max-height: var(--history-max-height);
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.moveButton {
+  text-align: left;
+  border: 1px solid transparent;
+  background: #fff8ee;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.currentMove {
+  border-color: rgba(179, 135, 78, 0.6);
+  background: #f1d9a8;
+  font-weight: 600;
+}
