@@ -23,7 +23,7 @@ Requires Node.js 20+ and pnpm.
 
 ## Engine Integration (High Level)
 - Stockfish runs in a dedicated Web Worker using UCI.
-- The UI requests analysis with explicit settings (depth/time/nodes) and MultiPV set to 3.
+- The UI requests analysis with explicit settings (default: fixed depth 8; time/nodes optional) and MultiPV set to 3.
 - Each analysis request is tagged with an ID so stale results are discarded when the position changes.
 
 ## Known Limitations
