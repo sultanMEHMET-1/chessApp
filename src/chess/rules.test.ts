@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PROMOTION_PIECES, STARTING_FEN } from './constants';
 import {
+  applyMoveToHistory,
+  exportPgn,
   getGameStatus,
   getGameStatusFromHistory,
-  getLegalMovesForSquare
+  getLegalMovesForSquare,
+  importPgn
 } from './rules';
 import type { MoveSelection } from './types';
 
@@ -31,6 +34,12 @@ const THREEFOLD_SEQUENCE: MoveSelection[] = [
 ];
 
 const MIN_PROMOTIONS = 4; // Promotion must include four choices.
+const SIMPLE_GAME_MOVES: MoveSelection[] = [
+  { from: 'e2', to: 'e4' },
+  { from: 'e7', to: 'e5' },
+  { from: 'g1', to: 'f3' }
+];
+const EXPECTED_SIMPLE_GAME_MOVES = 3; // Matches SIMPLE_GAME_MOVES length for assertions.
 
 describe('rules engine legality', () => {
   it('excludes pinned piece moves that expose the king', () => {
@@ -82,5 +91,32 @@ describe('rules engine draw detection', () => {
     const status = getGameStatus(INSUFFICIENT_MATERIAL_FEN);
 
     expect(status.isInsufficientMaterial).toBe(true);
+  });
+});
+
+describe('rules engine history and PGN', () => {
+  it('builds history state when applying moves', () => {
+    const snapshot = applyMoveToHistory(STARTING_FEN, [], SIMPLE_GAME_MOVES[0]);
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.moves).toHaveLength(1);
+    expect(snapshot?.san[0]).toBe('e4');
+    expect(snapshot?.lastMove?.from).toBe('e2');
+  });
+
+  it('round-trips PGN export and import for a simple game', () => {
+    const pgn = exportPgn(STARTING_FEN, SIMPLE_GAME_MOVES);
+    const imported = importPgn(pgn, STARTING_FEN);
+
+    expect(imported.error).toBeUndefined();
+    expect(imported.moves).toHaveLength(EXPECTED_SIMPLE_GAME_MOVES);
+    expect(imported.moves).toEqual(SIMPLE_GAME_MOVES);
+  });
+
+  it('rejects invalid PGN input', () => {
+    const imported = importPgn('not a pgn', STARTING_FEN);
+
+    expect(imported.error).toBeDefined();
+    expect(imported.moves).toHaveLength(0);
   });
 });

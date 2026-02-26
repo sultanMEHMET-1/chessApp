@@ -6,10 +6,12 @@ import { ALL_SQUARES, STARTING_FEN } from './constants';
 import type {
   BoardPiece,
   GameStatus,
+  HistorySnapshot,
   LastMove,
   LegalMove,
   MoveResult,
   MoveSelection,
+  PgnImportResult,
   PositionValidation,
   PromotionPiece
 } from './types';
@@ -53,6 +55,14 @@ function toLegalMove(move: Move): LegalMove {
     piece: move.piece,
     color: move.color,
     captured: move.captured,
+    promotion: move.promotion as PromotionPiece | undefined
+  };
+}
+
+function toMoveSelection(move: Move): MoveSelection {
+  return {
+    from: move.from,
+    to: move.to,
     promotion: move.promotion as PromotionPiece | undefined
   };
 }
@@ -103,6 +113,75 @@ function getGameStatusFromHistory(initialFen: string, moves: MoveSelection[]): G
   };
 }
 
+function getFenFromHistory(initialFen: string, moves: MoveSelection[]): string {
+  return createGameFromHistory(initialFen, moves).fen();
+}
+
+function getSanHistoryFromHistory(initialFen: string, moves: MoveSelection[]): string[] {
+  return createGameFromHistory(initialFen, moves).history();
+}
+
+function buildHistorySnapshot(game: Chess): HistorySnapshot {
+  const history = game.history({ verbose: true }).map((move) => toMoveSelection(move));
+  const san = game.history();
+  const lastMove = history.length
+    ? {
+        from: history[history.length - 1].from,
+        to: history[history.length - 1].to,
+        san: san[san.length - 1] ?? '',
+        promotion: history[history.length - 1].promotion
+      }
+    : undefined;
+
+  return {
+    moves: history,
+    san,
+    fen: game.fen(),
+    lastMove
+  };
+}
+
+function applyMoveToHistory(
+  initialFen: string,
+  moves: MoveSelection[],
+  move: MoveSelection
+): HistorySnapshot | null {
+  const game = createGameFromHistory(initialFen, moves);
+  const applied = game.move({
+    from: move.from,
+    to: move.to,
+    promotion: move.promotion
+  });
+  if (!applied) {
+    return null;
+  }
+  return buildHistorySnapshot(game);
+}
+
+function importPgn(pgn: string, initialFen: string = STARTING_FEN): PgnImportResult {
+  const game = createGameFromFen(initialFen);
+  const ok = game.loadPgn(pgn, { strict: true });
+  if (!ok) {
+    return {
+      moves: [],
+      san: [],
+      fen: initialFen,
+      error: 'Invalid PGN input.'
+    };
+  }
+  const snapshot = buildHistorySnapshot(game);
+  return {
+    moves: snapshot.moves,
+    san: snapshot.san,
+    fen: snapshot.fen
+  };
+}
+
+function exportPgn(initialFen: string, moves: MoveSelection[]): string {
+  const game = createGameFromHistory(initialFen, moves);
+  return game.pgn();
+}
+
 function applyMove(fen: string, move: MoveSelection): MoveResult | null {
   const game = createGameFromFen(fen);
   const applied = game.move({
@@ -151,12 +230,17 @@ function normalizePromotionSelection(moves: LegalMove[], to: Square): MoveSelect
 
 export {
   applyMove,
+  applyMoveToHistory,
   createGameFromFen,
   createGameFromHistory,
   ensureValidFen,
+  exportPgn,
   getBoardPieces,
   getGameStatus,
   getGameStatusFromHistory,
+  getFenFromHistory,
   getLegalMovesForSquare,
+  getSanHistoryFromHistory,
+  importPgn,
   normalizePromotionSelection
 };

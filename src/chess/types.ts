@@ -36,6 +36,20 @@ type MoveResult = {
   move: LegalMove;
 };
 
+type HistorySnapshot = {
+  moves: MoveSelection[];
+  san: string[];
+  fen: string;
+  lastMove?: LastMove;
+};
+
+type PgnImportResult = {
+  moves: MoveSelection[];
+  san: string[];
+  fen: string;
+  error?: string;
+};
+
 type LastMove = {
   from: Square;
   to: Square;
@@ -81,10 +95,12 @@ export type {
   CastlingRights,
   EditorPosition,
   GameStatus,
+  HistorySnapshot,
   LastMove,
   LegalMove,
   MoveResult,
   MoveSelection,
+  PgnImportResult,
   PlayerColor,
   PositionValidation,
   PromotionPiece
