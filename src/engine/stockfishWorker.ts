@@ -1,17 +1,13 @@
 import { ENGINE_PROTOCOL_VERSION } from './types';
 import type { AnalysisSettings, EngineRequest, EngineResponse } from './types';
 import { parseUciInfoLine } from './uciParser';
+import stockfishWorkerUrl from 'stockfish/src/stockfish-17.1-lite-single-03e3232.js?url';
 
 const LINE_PREFIX_INFO = 'info';
 const LINE_PREFIX_BESTMOVE = 'bestmove';
 const LINE_READY = 'uciok';
 
-const STOCKFISH_SCRIPT =
-  'stockfish/src/stockfish-17.1-lite-single-03e3232.js';
-
-const stockfishUrl = new URL(STOCKFISH_SCRIPT, import.meta.url);
-
-const engineWorker = new Worker(stockfishUrl, { type: 'classic' });
+const engineWorker = new Worker(stockfishWorkerUrl, { type: 'classic' });
 let activeRequestId: string | null = null;
 
 function post(response: EngineResponse) {
