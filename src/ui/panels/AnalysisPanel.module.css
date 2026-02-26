@@ -20,6 +20,16 @@
   cursor: pointer;
 }
 
+.presetButton {
+  border: 1px solid rgba(156, 122, 82, 0.4);
+  background: #fff3de;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .select,
 .input {
   border: 1px solid rgba(156, 122, 82, 0.4);
@@ -31,6 +41,49 @@
 .lineList {
   display: grid;
   gap: 10px;
+}
+
+.loadingRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #5a4937;
+}
+
+.loadingLabel {
+  font-weight: 600;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(156, 122, 82, 0.35);
+  border-top-color: #9c7a52;
+  animation: spin 0.9s linear infinite;
+}
+
+.loadingDots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.loadingDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(90, 73, 55, 0.7);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.loadingDot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loadingDot:nth-child(3) {
+  animation-delay: 0.4s;
 }
 
 .lineItem {
@@ -69,4 +122,22 @@
 .error {
   color: #8b3e24;
   font-size: 13px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
