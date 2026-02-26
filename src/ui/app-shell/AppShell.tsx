@@ -1,3 +1,4 @@
+import { Board } from "../board/Board";
 import styles from "./AppShell.module.css";
 
 const APP_TITLE = "Chess App";
@@ -17,7 +18,7 @@ export function AppShell() {
 
       <main className={styles.main}>
         <section className={styles.boardCard} aria-label="Board area">
-          <div className={styles.boardPlaceholder}>Board placeholder</div>
+          <Board />
           <div className={styles.mainMeta}>
             Move list, clocks, and controls will live in this space.
           </div>
