@@ -1,35 +1,44 @@
-import { access } from 'node:fs/promises';
+/**
+ * Resolves Stockfish worker assets for Vite configuration and tests.
+ */
+import { readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Validates that Vite can resolve the Stockfish worker asset URL import.
-// Keep this import specifier in sync with the Stockfish worker import.
 const STOCKFISH_PACKAGE_NAME = 'stockfish';
-const STOCKFISH_PACKAGE_PREFIX = `${STOCKFISH_PACKAGE_NAME}/`;
 const STOCKFISH_PACKAGE_JSON_IMPORT = `${STOCKFISH_PACKAGE_NAME}/package.json`;
-const STOCKFISH_WORKER_URL_QUERY = '?url';
-export const STOCKFISH_WORKER_URL_IMPORT =
-  `stockfish/src/stockfish-17.1-lite-single-03e3232.js${STOCKFISH_WORKER_URL_QUERY}`;
-const STOCKFISH_WORKER_ASSET_IMPORT = STOCKFISH_WORKER_URL_IMPORT.replace(
-  STOCKFISH_WORKER_URL_QUERY,
-  ''
-);
-const STOCKFISH_WORKER_ASSET_RELATIVE_PATH =
-  STOCKFISH_WORKER_ASSET_IMPORT.startsWith(STOCKFISH_PACKAGE_PREFIX)
-    ? STOCKFISH_WORKER_ASSET_IMPORT.slice(STOCKFISH_PACKAGE_PREFIX.length)
-    : STOCKFISH_WORKER_ASSET_IMPORT;
+const STOCKFISH_ASSET_DIR_NAME = 'src';
+const SCRIPT_EXTENSION = '.js';
+const WASM_EXTENSION = '.wasm';
+const DEFAULT_VARIANT_TOKEN = '';
+const STOCKFISH_VARIANT_PREFERENCES = [
+  { label: 'lite-single', token: 'lite-single' },
+  { label: 'lite', token: 'lite' },
+  { label: 'default', token: DEFAULT_VARIANT_TOKEN }
+];
 
-const STOCKFISH_WORKER_URL_ERROR =
-  `Stockfish worker URL could not be resolved for ${STOCKFISH_WORKER_URL_IMPORT}. ` +
-  'Verify the stockfish dependency and update src/engine/stockfishWorker.ts if needed.';
+export const STOCKFISH_WORKER_ASSETS_ERROR =
+  'Stockfish worker assets could not be resolved. ' +
+  'Run pnpm install and verify the stockfish package provides JS and WASM assets under stockfish/src.';
 
-export type ResolveId = (id: string) => Promise<{ id: string } | null>;
 export type ResolveModule = (id: string) => string | null;
-export type FileExists = (path: string) => Promise<boolean>;
+export type ListFiles = (path: string) => Promise<string[]>;
 export type ResolutionFallbacks = {
   resolveModule?: ResolveModule;
-  fileExists?: FileExists;
+  listFiles?: ListFiles;
+};
+
+export type StockfishWorkerAssetSelection = {
+  baseName: string;
+  scriptName: string;
+  wasmName: string;
+};
+
+export type StockfishWorkerAssets = {
+  baseName: string;
+  scriptPath: string;
+  wasmPath: string;
 };
 
 function defaultResolveModule(id: string): string | null {
@@ -49,77 +58,97 @@ function defaultResolveModule(id: string): string | null {
   }
 }
 
-async function defaultFileExists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
+async function defaultListFiles(path: string): Promise<string[]> {
+  const entries = await readdir(path, { withFileTypes: true });
+  return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
 }
 
-async function resolveWithNode(
-  id: string,
-  resolveModule: ResolveModule,
-  fileExists: FileExists
-): Promise<{ id: string } | null> {
-  const resolved = resolveModule(id);
-  if (!resolved) {
+function normalizeResolvedPath(resolved: string): string {
+  return resolved.startsWith('file://') ? fileURLToPath(resolved) : resolved;
+}
+
+function stripExtension(fileName: string, extension: string): string | null {
+  if (!fileName.endsWith(extension)) {
+    return null;
+  }
+  return fileName.slice(0, fileName.length - extension.length);
+}
+
+function buildBaseMap(files: string[], extension: string): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const file of files) {
+    const name = basename(file);
+    const base = stripExtension(name, extension);
+    if (!base) {
+      continue;
+    }
+    map.set(base, name);
+  }
+  return map;
+}
+
+export function selectStockfishWorkerAssets(
+  scriptFiles: string[],
+  wasmFiles: string[]
+): StockfishWorkerAssetSelection | null {
+  const scriptMap = buildBaseMap(scriptFiles, SCRIPT_EXTENSION);
+  const wasmMap = buildBaseMap(wasmFiles, WASM_EXTENSION);
+  const candidateBases = [...scriptMap.keys()].filter((base) => wasmMap.has(base));
+
+  if (candidateBases.length === 0) {
     return null;
   }
 
-  const resolvedPath = resolved.startsWith('file://')
-    ? fileURLToPath(resolved)
-    : resolved;
-  if (!(await fileExists(resolvedPath))) {
-    return null;
+  const sortedBases = [...candidateBases].sort();
+  for (const preference of STOCKFISH_VARIANT_PREFERENCES) {
+    const match =
+      preference.token === DEFAULT_VARIANT_TOKEN
+        ? sortedBases[0]
+        : sortedBases.find((base) => base.includes(preference.token));
+    if (match) {
+      return {
+        baseName: match,
+        scriptName: scriptMap.get(match) ?? `${match}${SCRIPT_EXTENSION}`,
+        wasmName: wasmMap.get(match) ?? `${match}${WASM_EXTENSION}`
+      };
+    }
   }
 
-  return { id: resolvedPath };
+  return null;
 }
 
-async function resolveWithPackageRoot(
-  resolveModule: ResolveModule,
-  fileExists: FileExists
-): Promise<{ id: string } | null> {
+export async function resolveStockfishWorkerAssets(
+  fallbacks: ResolutionFallbacks = {}
+): Promise<StockfishWorkerAssets | null> {
+  const resolveModule = fallbacks.resolveModule ?? defaultResolveModule;
+  const listFiles = fallbacks.listFiles ?? defaultListFiles;
+
   const resolvedPackageJson = resolveModule(STOCKFISH_PACKAGE_JSON_IMPORT);
   if (!resolvedPackageJson) {
     return null;
   }
 
-  const resolvedPackagePath = resolvedPackageJson.startsWith('file://')
-    ? fileURLToPath(resolvedPackageJson)
-    : resolvedPackageJson;
-  const candidate = join(
-    dirname(resolvedPackagePath),
-    STOCKFISH_WORKER_ASSET_RELATIVE_PATH
-  );
+  const packageJsonPath = normalizeResolvedPath(resolvedPackageJson);
+  const packageRoot = dirname(packageJsonPath);
+  const assetDir = join(packageRoot, STOCKFISH_ASSET_DIR_NAME);
 
-  if (!(await fileExists(candidate))) {
+  let files: string[] = [];
+  try {
+    files = await listFiles(assetDir);
+  } catch {
     return null;
   }
 
-  return { id: candidate };
-}
-
-export async function ensureStockfishWorkerUrlResolved(
-  resolveId: ResolveId,
-  fallbacks: ResolutionFallbacks = {}
-): Promise<void> {
-  const resolved =
-    (await resolveId(STOCKFISH_WORKER_URL_IMPORT)) ??
-    (await resolveId(STOCKFISH_WORKER_ASSET_IMPORT)) ??
-    (await resolveWithNode(
-      STOCKFISH_WORKER_ASSET_IMPORT,
-      fallbacks.resolveModule ?? defaultResolveModule,
-      fallbacks.fileExists ?? defaultFileExists
-    )) ??
-    (await resolveWithPackageRoot(
-      fallbacks.resolveModule ?? defaultResolveModule,
-      fallbacks.fileExists ?? defaultFileExists
-    ));
-
-  if (!resolved || !resolved.id) {
-    throw new Error(STOCKFISH_WORKER_URL_ERROR);
+  const scriptFiles = files.filter((file) => basename(file).endsWith(SCRIPT_EXTENSION));
+  const wasmFiles = files.filter((file) => basename(file).endsWith(WASM_EXTENSION));
+  const selection = selectStockfishWorkerAssets(scriptFiles, wasmFiles);
+  if (!selection) {
+    return null;
   }
+
+  return {
+    baseName: selection.baseName,
+    scriptPath: join(assetDir, selection.scriptName),
+    wasmPath: join(assetDir, selection.wasmName)
+  };
 }
