@@ -12,7 +12,7 @@ const SAMPLE_LINE: AnalysisLine = {
   bestMoveUci: 'e2e4',
   bestMoveSan: 'e4',
   pvUci: ['e2e4', 'e7e5'],
-  pvSan: ['e4', '...']
+  pvSan: ['e4', 'e5']
 };
 
 const STALE_LINE: AnalysisLine = {
@@ -22,7 +22,7 @@ const STALE_LINE: AnalysisLine = {
   bestMoveUci: 'd2d4',
   bestMoveSan: 'd4',
   pvUci: ['d2d4', 'd7d5'],
-  pvSan: ['d4', '...']
+  pvSan: ['d4', 'd5']
 };
 
 describe('analysisReducer', () => {
