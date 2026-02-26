@@ -1,16 +1,22 @@
 # Chess App
 
-This repository is developed via Agent Orchestrator. There is no application code yet; only docs and configs are present.
+A React + TypeScript chess UI backed by chess.js for move legality and a Stockfish (WASM) analysis worker.
 
 ## Install And Run
-Requires Node.js 20+ and pnpm. Once the app scaffold is added, run `pnpm install` and then `pnpm dev` to start the Vite dev server.
+Requires Node.js 20+ and pnpm.
+
+1. `pnpm install`
+2. `pnpm dev`
 
 ## Tests
-Run unit tests with `pnpm test` (Vitest). Run the Playwright smoke suite with `pnpm playwright test`.
+- Unit + integration (Vitest): `pnpm test`
+- Playwright smoke suite: `pnpm playwright:test`
 
 ## Engine Integration (High Level)
-The chess engine will run Stockfish (WASM) in a Web Worker and speak UCI. The UI will request analysis with explicit settings (depth, time, or nodes) and MultiPV set to 3. Analysis responses will be tagged with request IDs so stale results are discarded when the position changes.
+- Stockfish runs in a Web Worker using UCI.
+- The UI requests analysis with explicit settings (depth/time/nodes) and MultiPV set to 3.
+- Each analysis request is tagged with an ID so stale results are discarded when the position changes.
 
 ## Known Limitations
-- Application scaffold, chess UI, and engine worker are not yet implemented.
-- Test commands will be wired once the project is bootstrapped.
+- Promotion defaults to queen; underpromotion selection will be added in a later issue.
+- The position editor validates FEN using chess.js rules; analysis-only illegal setups are limited to what FEN validation allows.
