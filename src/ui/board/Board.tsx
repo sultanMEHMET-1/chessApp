@@ -1,10 +1,11 @@
 // Interactive chessboard UI wired to ChessState for legal move selection and status display.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Color, PieceSymbol, Square } from "chess.js";
 import {
   ChessState,
   type BoardPiece,
   type LegalMove,
+  type MoveRecord,
   type PromotionPiece
 } from "../../chess/chessState";
 import { applyMove } from "../../chess/selection";
@@ -71,25 +72,57 @@ const MOVE_ERROR_MESSAGE = "That move is not legal for the current position.";
 
 type BoardProps = {
   initialFen?: string;
+  state?: ChessState;
+  positionVersion?: number;
+  lastMove?: {
+    from: Square;
+    to: Square;
+  } | null;
+  onMoveApplied?: (move: MoveRecord) => void;
 };
 
-export function Board({ initialFen }: BoardProps) {
-  const [chessState] = useState(() => new ChessState(initialFen));
+export function Board({
+  initialFen,
+  state,
+  positionVersion,
+  lastMove,
+  onMoveApplied
+}: BoardProps) {
+  const [chessState] = useState(() => state ?? new ChessState(initialFen));
   const [fen, setFen] = useState(() => chessState.getFen());
   const [sideToMove, setSideToMove] = useState(() => chessState.getSideToMove());
   const [isCheck, setIsCheck] = useState(() => chessState.isInCheck());
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<LegalMove[]>([]);
-  const [lastMove, setLastMove] = useState<{
+  const [internalLastMove, setInternalLastMove] = useState<{
     from: Square;
     to: Square;
   } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const resolvedLastMove =
+    lastMove === undefined ? internalLastMove : lastMove;
+
   const legalDestinations = useMemo(
     () => new Set(legalMoves.map((move) => move.to)),
     [legalMoves]
   );
+
+  useEffect(() => {
+    if (positionVersion === undefined) {
+      return;
+    }
+
+    setFen(chessState.getFen());
+    setSideToMove(chessState.getSideToMove());
+    setIsCheck(chessState.isInCheck());
+    setSelectedSquare(null);
+    setLegalMoves([]);
+    setErrorMessage(null);
+    if (lastMove !== undefined) {
+      setInternalLastMove(lastMove);
+    }
+  }, [positionVersion, lastMove, chessState]);
 
   const refreshStatus = () => {
     setFen(chessState.getFen());
@@ -125,10 +158,12 @@ export function Board({ initialFen }: BoardProps) {
       return;
     }
 
-    setLastMove({ from: result.move.from, to: result.move.to });
+    const appliedLastMove = { from: result.move.from, to: result.move.to };
+    setInternalLastMove(appliedLastMove);
     refreshStatus();
     clearSelection();
     setErrorMessage(null);
+    onMoveApplied?.(result.move);
   };
 
   const handleSquareClick = (square: Square) => {
@@ -164,8 +199,8 @@ export function Board({ initialFen }: BoardProps) {
             const isSelected = selectedSquare === squareData.square;
             const isLegalDestination = legalDestinations.has(squareData.square);
             const isLastMove =
-              lastMove?.from === squareData.square ||
-              lastMove?.to === squareData.square;
+              resolvedLastMove?.from === squareData.square ||
+              resolvedLastMove?.to === squareData.square;
             const className = [
               styles.square,
               squareData.isDark ? styles.darkSquare : styles.lightSquare,
