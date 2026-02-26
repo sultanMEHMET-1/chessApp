@@ -11,6 +11,8 @@ const STOCKFISH_PACKAGE_JSON_PATH = `${STOCKFISH_PACKAGE_ROOT}/package.json`;
 const STOCKFISH_PACKAGE_ENTRY_PATH = `${STOCKFISH_PACKAGE_ROOT}/index.js`;
 const STOCKFISH_ASSET_DIR_SRC = `${STOCKFISH_PACKAGE_ROOT}/src`;
 const STOCKFISH_ASSET_DIR_DIST = `${STOCKFISH_PACKAGE_ROOT}/dist`;
+const LOCAL_NODE_MODULES_ROOT = `${process.cwd()}/node_modules/stockfish`;
+const LOCAL_NODE_MODULES_JSON = `${LOCAL_NODE_MODULES_ROOT}/package.json`;
 
 describe('selectStockfishWorkerAssets', () => {
   it('prefers lite-single when available', () => {
@@ -121,5 +123,24 @@ describe('resolveStockfishWorkerAssets', () => {
     expect(resolved?.scriptPath).toBe(
       `${STOCKFISH_ASSET_DIR_DIST}/stockfish-17.1-lite.js`
     );
+  });
+
+  it('uses a local node_modules fallback when resolution fails', async () => {
+    const resolved = await resolveStockfishWorkerAssets({
+      resolveModule: () => null,
+      listFiles: async (path) => {
+        if (path !== `${LOCAL_NODE_MODULES_ROOT}/src`) {
+          throw new Error(`Unexpected path: ${path}`);
+        }
+        return ['stockfish-17.1-lite.js', 'stockfish-17.1-lite.wasm'];
+      },
+      fileExists: async (path) => path === LOCAL_NODE_MODULES_JSON
+    });
+
+    expect(resolved).toEqual({
+      baseName: 'stockfish-17.1-lite',
+      scriptPath: `${LOCAL_NODE_MODULES_ROOT}/src/stockfish-17.1-lite.js`,
+      wasmPath: `${LOCAL_NODE_MODULES_ROOT}/src/stockfish-17.1-lite.wasm`
+    });
   });
 });

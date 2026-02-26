@@ -10,6 +10,7 @@ const STOCKFISH_PACKAGE_NAME = 'stockfish';
 const STOCKFISH_PACKAGE_ENTRY_IMPORT = STOCKFISH_PACKAGE_NAME;
 const STOCKFISH_PACKAGE_JSON_IMPORT = `${STOCKFISH_PACKAGE_NAME}/package.json`;
 const STOCKFISH_PACKAGE_JSON_NAME = 'package.json';
+const NODE_MODULES_DIR_NAME = 'node_modules';
 const STOCKFISH_ASSET_DIR_CANDIDATES = ['src', 'dist', ''];
 const SCRIPT_EXTENSION = '.js';
 const WASM_EXTENSION = '.wasm';
@@ -47,19 +48,21 @@ export type StockfishWorkerAssets = {
 
 function defaultResolveModule(id: string): string | null {
   try {
+    const projectRequire = createRequire(join(process.cwd(), 'package.json'));
+    return projectRequire.resolve(id);
+  } catch {
+    // Fall through to import-meta resolution.
+  }
+
+  try {
     if (typeof import.meta.resolve === 'function') {
       return import.meta.resolve(id);
     }
   } catch {
-    // Fall through to require-based resolution.
-  }
-
-  try {
-    const projectRequire = createRequire(join(process.cwd(), 'package.json'));
-    return projectRequire.resolve(id);
-  } catch {
     return null;
   }
+
+  return null;
 }
 
 async function defaultListFiles(path: string): Promise<string[]> {
@@ -169,6 +172,18 @@ export async function resolveStockfishWorkerAssets(
         normalizeResolvedPath(resolvedEntry),
         fileExists
       );
+    }
+  }
+
+  if (!packageRoot) {
+    const localPackageJson = join(
+      process.cwd(),
+      NODE_MODULES_DIR_NAME,
+      STOCKFISH_PACKAGE_NAME,
+      STOCKFISH_PACKAGE_JSON_NAME
+    );
+    if (await fileExists(localPackageJson)) {
+      packageRoot = dirname(localPackageJson);
     }
   }
 
