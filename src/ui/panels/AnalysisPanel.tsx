@@ -52,6 +52,7 @@ function AnalysisPanel({
           type="button"
           className={styles.controlButton}
           onClick={() => onToggle(!enabled)}
+          data-testid="analysis-toggle"
         >
           {enabled ? 'Stop Analysis' : 'Start Analysis'}
         </button>
@@ -59,6 +60,7 @@ function AnalysisPanel({
           className={styles.select}
           value={mode}
           onChange={(event) => onModeChange(event.target.value as AnalysisMode)}
+          data-testid="analysis-mode"
         >
           {ANALYSIS_MODES.map((option) => (
             <option key={option.value} value={option.value}>
@@ -72,6 +74,7 @@ function AnalysisPanel({
           min={MIN_ANALYSIS_VALUE}
           value={value}
           onChange={(event) => onValueChange(Number(event.target.value))}
+          data-testid="analysis-value"
         />
         {status === 'error' && (
           <button type="button" className={styles.controlButton} onClick={onRestart}>
