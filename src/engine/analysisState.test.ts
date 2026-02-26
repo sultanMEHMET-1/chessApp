@@ -9,14 +9,20 @@ const SAMPLE_LINE: AnalysisLine = {
   multipv: 1,
   depth: 12,
   score: { type: 'cp', value: 18 },
-  pv: ['e2e4', 'e7e5']
+  bestMoveUci: 'e2e4',
+  bestMoveSan: 'e4',
+  pvUci: ['e2e4', 'e7e5'],
+  pvSan: ['e4', 'e5']
 };
 
 const STALE_LINE: AnalysisLine = {
   multipv: 2,
   depth: 10,
   score: { type: 'cp', value: -12 },
-  pv: ['d2d4', 'd7d5']
+  bestMoveUci: 'd2d4',
+  bestMoveSan: 'd4',
+  pvUci: ['d2d4', 'd7d5'],
+  pvSan: ['d4', 'd5']
 };
 
 describe('analysisReducer', () => {

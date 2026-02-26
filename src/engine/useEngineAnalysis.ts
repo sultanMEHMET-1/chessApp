@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { analysisReducer, createInitialAnalysisState } from './analysisState';
+import { buildAnalysisLine } from './analysisLine';
 import {
   DEFAULT_MULTIPV,
   ENGINE_PROTOCOL_VERSION
@@ -9,8 +10,6 @@ import type { AnalysisSettings, EngineRequest, EngineResponse } from './types';
 const REQUEST_PREFIX = 'analysis';
 const REQUEST_COUNTER_START = 0;
 const WORKER_UNAVAILABLE_MESSAGE = 'Web Workers are not available in this environment.';
-
-const HAS_WORKER_SUPPORT = typeof Worker !== 'undefined';
 
 function buildRequestId(counter: number): string {
   return `${REQUEST_PREFIX}-${counter}`;
@@ -27,6 +26,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
   const [isReady, setIsReady] = useState(false);
   const workerRef = useRef<Worker | null>(null);
   const requestCounterRef = useRef(REQUEST_COUNTER_START);
+  const activeRequestRef = useRef<{ requestId: string; fen: string } | null>(null);
 
   const sendMessage = useCallback((message: EngineRequest) => {
     workerRef.current?.postMessage(message);
@@ -37,7 +37,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
       return;
     }
 
-    if (!HAS_WORKER_SUPPORT) {
+    if (typeof Worker === 'undefined') {
       dispatch({ type: 'error', message: WORKER_UNAVAILABLE_MESSAGE });
       return;
     }
@@ -56,7 +56,11 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
         return;
       }
       if (response.type === 'analysis') {
-        dispatch({ type: 'line', requestId: response.requestId, line: response.line });
+        if (!activeRequestRef.current || response.requestId !== activeRequestRef.current.requestId) {
+          return;
+        }
+        const formatted = buildAnalysisLine(activeRequestRef.current.fen, response.line);
+        dispatch({ type: 'line', requestId: response.requestId, line: formatted });
         return;
       }
       if (response.type === 'done') {
@@ -89,6 +93,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
     workerRef.current.terminate();
     workerRef.current = null;
     setIsReady(false);
+    activeRequestRef.current = null;
   }, [sendMessage]);
 
   useEffect(() => {
@@ -102,6 +107,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
     if (!enabled) {
       dispatch({ type: 'reset' });
       sendMessage({ type: 'stop', version: ENGINE_PROTOCOL_VERSION });
+      activeRequestRef.current = null;
       return;
     }
 
@@ -112,6 +118,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
     requestCounterRef.current += 1;
     const requestId = buildRequestId(requestCounterRef.current);
     dispatch({ type: 'start', requestId });
+    activeRequestRef.current = { requestId, fen };
 
     sendMessage({
       type: 'analyze',
