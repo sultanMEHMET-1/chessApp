@@ -1,0 +1,54 @@
+dataDir: ~/.agent-orchestrator
+worktreeDir: ~/.worktrees
+port: 3001
+defaults:
+  runtime: tmux
+  agent: codex
+  workspace: worktree
+  notifiers:
+    - desktop
+projects:
+  chess:
+    repo: sultanMEHMET-1/chessApp
+    path: /home/mercanmeh/code/hobbyWork/chess
+    defaultBranch: main
+
+    agentRules:
+      Use full-auto approval (`--full-auto`) for this session. Implement the issue, run and fix tests, commit small, push the branch, open a GitHub PR referencing the issue, and then /exit.
+      Write clean, well-documented code.
+      Follow project conventions.
+      Run tests before committing and pushing.
+      Use conventional commits (feat:, fix:, chore:).
+      Link issue numbers in commit messages.
+    agentRulesFile: AGENTS.md
+
+
+
+reactions:
+  ci-failed:
+    auto: true # Enable auto-handling
+    action: send-to-agent # Send failure logs to agent
+    retries: 2 # Retry up to 2 times
+    escalateAfter: 2 # Notify human after 2 failures
+
+  changes-requested:
+    auto: true
+    action: send-to-agent
+    escalateAfter: 30m # Notify human if not resolved in 30 minutes
+
+  approved-and-green:
+    auto: true # Enable auto-merge
+    action: auto-merge # Merge when approved + CI passes
+    priority: action # Notification priority
+
+
+  agent-stuck:
+    threshold: 10m # Consider stuck after 10 minutes of inactivity
+    action: notify
+    priority: urgent
+notificationRouting:
+  urgent: [desktop, slack] # Agent stuck, needs input, errored
+  action: [desktop, slack] # PR ready to merge
+  warning: [slack] # Auto-fix failed
+  info: [slack] # Summary, all done
+
