@@ -9,6 +9,8 @@ describe("App", () => {
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("complementary")).toBeInTheDocument();
-    expect(screen.getByText(/analysis/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Analysis", level: 2 })
+    ).toBeInTheDocument();
   });
 });
