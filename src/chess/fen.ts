@@ -21,8 +21,8 @@ import type {
 const CASTLING_NONE = '-';
 const EN_PASSANT_NONE = '-';
 const FEN_PARTS_COUNT = 6; // FEN standard has 6 fields.
-const FEN_TURN_INDEX = 1;
-const FEN_EN_PASSANT_INDEX = 3;
+const FEN_TURN_INDEX = 1; // Active color field index in a 6-part FEN.
+const FEN_EN_PASSANT_INDEX = 3; // En passant field index in a 6-part FEN.
 const BOARD_EMPTY_THRESHOLD = 0; // No empty squares counted yet.
 const MAX_EMPTY_RUN = 8; // A rank can have up to 8 empty squares.
 const KING_COUNT_ERROR = 'Each side must have exactly one king.';
