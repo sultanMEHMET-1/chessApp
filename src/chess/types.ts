@@ -71,6 +71,7 @@ type GameStatus = {
 type PositionValidation = {
   ok: boolean;
   error?: string;
+  warning?: string;
 };
 
 type CastlingRights = {

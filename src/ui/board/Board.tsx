@@ -1,5 +1,5 @@
 // Interactive chessboard UI with optional controlled and uncontrolled modes.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Color, PieceSymbol, Square } from 'chess.js';
 import {
   ChessState,
@@ -19,11 +19,18 @@ type ControlledBoardProps = {
   onSquareClick: (square: Square) => void;
 };
 
+type ExternalBoardProps = {
+  state: ChessState;
+  positionVersion?: number;
+  lastMove?: { from: Square; to: Square } | null;
+  onMoveApplied?: (move: MoveRecord) => void;
+};
+
 type UncontrolledBoardProps = {
   initialFen?: string;
 };
 
-type BoardProps = ControlledBoardProps | UncontrolledBoardProps;
+type BoardProps = ControlledBoardProps | ExternalBoardProps | UncontrolledBoardProps;
 
 type BoardSquare = {
   square: Square;
@@ -108,31 +115,43 @@ const MOVE_HISTORY_LABEL = 'Move history';
 const PENDING_MOVE_LABEL = '--';
 const MOVE_BUTTON_TEST_ID_PREFIX = 'move';
 
+type MoveHighlight = { from: Square; to: Square } | null | undefined;
+
 export function Board(props: BoardProps) {
   const isControlled = 'pieces' in props;
-  const initialFen = !isControlled ? props.initialFen : undefined;
+  const isExternal = !isControlled && 'state' in props;
+  const isStandalone = !isControlled && !isExternal;
 
-  const [chessState] = useState(() => new ChessState(initialFen));
+  const initialFen = isStandalone ? props.initialFen : undefined;
+  const [internalState] = useState(() => new ChessState(initialFen));
+  const chessState = isExternal ? props.state : internalState;
+
   const [startFen] = useState(() => chessState.getFen());
   const [currentPly, setCurrentPly] = useState(() => START_PLY_INDEX);
   const [internalSelectedSquare, setInternalSelectedSquare] =
     useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<StateLegalMove[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [internalLastMove, setInternalLastMove] = useState<MoveHighlight>(null);
 
-  const history = chessState.getHistory();
-  const latestPly = history.length;
-  const isViewingLatest = currentPly === latestPly;
+  const history = isStandalone ? chessState.getHistory() : [];
+  const latestPly = isStandalone ? history.length : START_PLY_INDEX;
+  const isViewingLatest = !isStandalone || currentPly === latestPly;
 
-  const viewFen =
-    currentPly === START_PLY_INDEX
+  const viewFen = isStandalone
+    ? currentPly === START_PLY_INDEX
       ? startFen
-      : history[currentPly - SINGLE_PLY]?.after ?? startFen;
-  const viewState = useMemo(() => new ChessState(viewFen), [viewFen]);
+      : history[currentPly - SINGLE_PLY]?.after ?? startFen
+    : chessState.getFen();
+  const viewState = useMemo(
+    () => (isStandalone ? new ChessState(viewFen) : chessState),
+    [chessState, isStandalone, viewFen]
+  );
+
   const sideToMove = viewState.getSideToMove();
   const isCheck = viewState.isInCheck();
   const fen = viewState.getFen();
-  const lastMove =
+  const historyLastMove =
     currentPly === START_PLY_INDEX
       ? null
       : history[currentPly - SINGLE_PLY] ?? null;
@@ -148,7 +167,24 @@ export function Board(props: BoardProps) {
   const selectedSquare = isControlled
     ? props.selectedSquare
     : internalSelectedSquare;
-  const lastMoveHighlight = isControlled ? props.lastMove : lastMove ?? undefined;
+  const lastMoveHighlight: MoveHighlight = isControlled
+    ? props.lastMove
+    : isExternal
+      ? props.lastMove ?? internalLastMove
+      : historyLastMove ?? undefined;
+
+  useEffect(() => {
+    if (!isExternal || props.positionVersion === undefined) {
+      return;
+    }
+
+    setInternalSelectedSquare(null);
+    setLegalMoves([]);
+    setErrorMessage(null);
+    if (props.lastMove !== undefined) {
+      setInternalLastMove(props.lastMove);
+    }
+  }, [isExternal, props.positionVersion, props.lastMove]);
 
   const clearSelection = () => {
     setInternalSelectedSquare(null);
@@ -188,13 +224,28 @@ export function Board(props: BoardProps) {
       return;
     }
 
-    setCurrentPly(chessState.getHistory().length);
+    if (isStandalone) {
+      setCurrentPly(chessState.getHistory().length);
+    } else {
+      const appliedLastMove = { from: result.move.from, to: result.move.to };
+      setInternalLastMove(appliedLastMove);
+    }
+
     clearSelection();
     setErrorMessage(null);
+
+    if (isExternal && props.onMoveApplied) {
+      props.onMoveApplied(result.move);
+    }
   };
 
-  const handleUncontrolledSquareClick = (square: Square) => {
-    if (!isViewingLatest) {
+  const handleSquareClick = (square: Square) => {
+    if (isControlled) {
+      props.onSquareClick(square);
+      return;
+    }
+
+    if (isStandalone && !isViewingLatest) {
       return;
     }
 
@@ -210,7 +261,7 @@ export function Board(props: BoardProps) {
       }
     }
 
-    const piece = viewState.getPiece(square);
+    const piece = chessState.getPiece(square);
 
     if (piece && piece.color === sideToMove) {
       selectSquare(square);
@@ -219,15 +270,6 @@ export function Board(props: BoardProps) {
     }
 
     clearSelection();
-  };
-
-  const handleSquareClick = (square: Square) => {
-    if (isControlled) {
-      props.onSquareClick(square);
-      return;
-    }
-
-    handleUncontrolledSquareClick(square);
   };
 
   const renderBoard = (
@@ -296,7 +338,10 @@ export function Board(props: BoardProps) {
   return (
     <div className={styles.panel}>
       <div className={styles.boardWrapper}>
-        {renderBoard((square) => viewState.getPiece(square), !isViewingLatest)}
+        {renderBoard(
+          (square) => (isStandalone ? viewState.getPiece(square) : chessState.getPiece(square)),
+          isStandalone ? !isViewingLatest : false
+        )}
       </div>
 
       <div className={styles.statusPanel} aria-live="polite">
@@ -326,105 +371,111 @@ export function Board(props: BoardProps) {
         </p>
       ) : null}
 
-      <section className={styles.historyPanel} aria-label={MOVE_HISTORY_LABEL}>
-        <div className={styles.historyHeader}>
-          <div>
-            <h3 className={styles.historyTitle}>{HISTORY_TITLE}</h3>
-            <p className={styles.historyStatus} data-testid="history-status">
-              {historyStatus}
-            </p>
+      {isStandalone && (
+        <section className={styles.historyPanel} aria-label={MOVE_HISTORY_LABEL}>
+          <div className={styles.historyHeader}>
+            <div>
+              <h3 className={styles.historyTitle}>{HISTORY_TITLE}</h3>
+              <p className={styles.historyStatus} data-testid="history-status">
+                {historyStatus}
+              </p>
+            </div>
+            <div
+              className={styles.historyNav}
+              role="group"
+              aria-label={MOVE_NAVIGATION_LABEL}
+            >
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={() => goToPly(START_PLY_INDEX)}
+                disabled={!canNavigateBack}
+                data-testid="nav-start"
+              >
+                {NAV_START_LABEL}
+              </button>
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={() => goToPly(currentPly - SINGLE_PLY)}
+                disabled={!canNavigateBack}
+                data-testid="nav-back"
+              >
+                {NAV_BACK_LABEL}
+              </button>
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={() => goToPly(currentPly + SINGLE_PLY)}
+                disabled={!canNavigateForward}
+                data-testid="nav-forward"
+              >
+                {NAV_FORWARD_LABEL}
+              </button>
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={() => goToPly(latestPly)}
+                disabled={!canNavigateForward}
+                data-testid="nav-end"
+              >
+                {NAV_END_LABEL}
+              </button>
+            </div>
           </div>
-          <div className={styles.historyNav} role="group" aria-label={MOVE_NAVIGATION_LABEL}>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => goToPly(START_PLY_INDEX)}
-              disabled={!canNavigateBack}
-              data-testid="nav-start"
-            >
-              {NAV_START_LABEL}
-            </button>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => goToPly(currentPly - SINGLE_PLY)}
-              disabled={!canNavigateBack}
-              data-testid="nav-back"
-            >
-              {NAV_BACK_LABEL}
-            </button>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => goToPly(currentPly + SINGLE_PLY)}
-              disabled={!canNavigateForward}
-              data-testid="nav-forward"
-            >
-              {NAV_FORWARD_LABEL}
-            </button>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => goToPly(latestPly)}
-              disabled={!canNavigateForward}
-              data-testid="nav-end"
-            >
-              {NAV_END_LABEL}
-            </button>
-          </div>
-        </div>
 
-        {moveRows.length === START_PLY_INDEX ? (
-          <p className={styles.historyEmpty}>{HISTORY_EMPTY_MESSAGE}</p>
-        ) : (
-          <ol className={styles.historyList} data-testid="move-history">
-            {moveRows.map((row) => {
-              const isWhiteCurrent = currentPly === row.whitePly;
-              const isBlackCurrent = currentPly === row.blackPly;
-              const whiteClassName = [
-                styles.moveButton,
-                isWhiteCurrent ? styles.currentMove : ''
-              ]
-                .filter(Boolean)
-                .join(' ');
-              const blackClassName = [
-                styles.moveButton,
-                isBlackCurrent ? styles.currentMove : ''
-              ]
-                .filter(Boolean)
-                .join(' ');
+          {moveRows.length === START_PLY_INDEX ? (
+            <p className={styles.historyEmpty}>{HISTORY_EMPTY_MESSAGE}</p>
+          ) : (
+            <ol className={styles.historyList} data-testid="move-history">
+              {moveRows.map((row) => {
+                const isWhiteCurrent = currentPly === row.whitePly;
+                const isBlackCurrent = currentPly === row.blackPly;
+                const whiteClassName = [
+                  styles.moveButton,
+                  isWhiteCurrent ? styles.currentMove : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+                const blackClassName = [
+                  styles.moveButton,
+                  isBlackCurrent ? styles.currentMove : ''
+                ]
+                  .filter(Boolean)
+                  .join(' ');
 
-              return (
-                <li key={row.moveNumber} className={styles.historyRow}>
-                  <span className={styles.moveNumber}>{row.moveNumber}.</span>
-                  <button
-                    type="button"
-                    className={whiteClassName}
-                    onClick={() => goToPly(row.whitePly)}
-                    data-testid={`${MOVE_BUTTON_TEST_ID_PREFIX}-${row.whitePly}`}
-                    aria-current={isWhiteCurrent ? 'true' : undefined}
-                  >
-                    {row.whiteMove.san}
-                  </button>
-                  {row.blackMove && row.blackPly ? (
+                return (
+                  <li key={row.moveNumber} className={styles.historyRow}>
+                    <span className={styles.moveNumber}>{row.moveNumber}.</span>
                     <button
                       type="button"
-                      className={blackClassName}
-                      onClick={() => goToPly(row.blackPly)}
-                      data-testid={`${MOVE_BUTTON_TEST_ID_PREFIX}-${row.blackPly}`}
-                      aria-current={isBlackCurrent ? 'true' : undefined}
+                      className={whiteClassName}
+                      onClick={() => goToPly(row.whitePly)}
+                      data-testid={`${MOVE_BUTTON_TEST_ID_PREFIX}-${row.whitePly}`}
+                      aria-current={isWhiteCurrent ? 'true' : undefined}
                     >
-                      {row.blackMove.san}
+                      {row.whiteMove.san}
                     </button>
-                  ) : (
-                    <span className={styles.pendingMove}>{PENDING_MOVE_LABEL}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        )}
-      </section>
+                    {row.blackMove && row.blackPly ? (
+                      <button
+                        type="button"
+                        className={blackClassName}
+                        onClick={() => goToPly(row.blackPly)}
+                        data-testid={`${MOVE_BUTTON_TEST_ID_PREFIX}-${row.blackPly}`}
+                        aria-current={isBlackCurrent ? 'true' : undefined}
+                      >
+                        {row.blackMove.san}
+                      </button>
+                    ) : (
+                      <span className={styles.pendingMove}>{PENDING_MOVE_LABEL}</span>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </section>
+      )}
     </div>
   );
 }

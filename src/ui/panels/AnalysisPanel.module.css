@@ -55,6 +55,17 @@
   word-break: break-word;
 }
 
+.bestMove {
+  font-size: 12px;
+  color: #3a2c1f;
+  margin-top: 4px;
+}
+
+.bestMoveUci {
+  margin-left: 6px;
+  color: #7a5d42;
+}
+
 .error {
   color: #8b3e24;
   font-size: 13px;

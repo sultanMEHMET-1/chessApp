@@ -17,11 +17,23 @@ type Score =
   | { type: 'cp'; value: number }
   | { type: 'mate'; value: number };
 
-type AnalysisLine = {
+type EngineAnalysisLine = {
   multipv: number;
   depth: number;
   score: Score;
   pv: string[];
+  nodes?: number;
+  time?: number;
+};
+
+type AnalysisLine = {
+  multipv: number;
+  depth: number;
+  score: Score;
+  bestMoveUci: string;
+  bestMoveSan: string;
+  pvUci: string[];
+  pvSan: string[];
   nodes?: number;
   time?: number;
 };
@@ -44,7 +56,7 @@ type EngineResponse =
       version: number;
       type: 'analysis';
       requestId: string;
-      line: AnalysisLine;
+      line: EngineAnalysisLine;
     }
   | { version: number; type: 'done'; requestId: string }
   | { version: number; type: 'error'; requestId?: string; message: string };
@@ -58,6 +70,7 @@ export type {
   AnalysisLine,
   AnalysisMode,
   AnalysisSettings,
+  EngineAnalysisLine,
   EngineRequest,
   EngineResponse,
   Score

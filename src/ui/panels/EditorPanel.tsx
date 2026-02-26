@@ -32,6 +32,7 @@ type EditorPanelProps = {
   selectedPiece: BoardPiece | null;
   isActive: boolean;
   error?: string;
+  warning?: string;
   onToggleActive: (active: boolean) => void;
   onSelectPiece: (piece: BoardPiece | null) => void;
   onUpdateEditor: (editor: EditorPosition) => void;
@@ -43,6 +44,7 @@ function EditorPanel({
   selectedPiece,
   isActive,
   error,
+  warning,
   onToggleActive,
   onSelectPiece,
   onUpdateEditor,
@@ -97,6 +99,7 @@ function EditorPanel({
           type="checkbox"
           checked={isActive}
           onChange={(event) => onToggleActive(event.target.checked)}
+          data-testid="editor-toggle"
         />
         Enable editor mode
       </label>
@@ -117,6 +120,7 @@ function EditorPanel({
                   : styles.paletteButton
               }
               onClick={() => onSelectPiece(option.piece)}
+              data-testid={`editor-piece-${option.id}`}
             >
               {option.label}
             </button>
@@ -222,16 +226,31 @@ function EditorPanel({
             type="checkbox"
             checked={editor.allowIllegal}
             onChange={(event) => handleAllowIllegalChange(event.target.checked)}
+            data-testid="editor-allow-illegal"
           />
           Allow illegal positions (analysis only)
         </label>
       </div>
 
-      <button type="button" className={styles.applyButton} onClick={onApply}>
+      <button
+        type="button"
+        className={styles.applyButton}
+        onClick={onApply}
+        data-testid="editor-apply"
+      >
         Apply Position
       </button>
 
-      {error && <span className={styles.error}>{error}</span>}
+      {warning && (
+        <span className={styles.warning} role="status" data-testid="editor-warning">
+          Warning: {warning}
+        </span>
+      )}
+      {error && (
+        <span className={styles.error} role="alert" data-testid="editor-error">
+          {error}
+        </span>
+      )}
     </div>
   );
 }
