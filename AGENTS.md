@@ -27,7 +27,7 @@ Failure to comply with these rules is considered an incorrect response.
 ## 1. Git Workflow (Mandatory)
 
 This directory is a git repository.
-Never merge to main except for merging a Pull Requeset that is done and finished.(no git merge, no git push origin main, no “please merge for me” prompts).
+Never merge to main unless a Pull Request is fully opened, all required tests have passed, and the merge is verified not to break functionality. (No git merge, no git push origin main, no “please merge for me” prompts.)
 - Work only on the session branch created by AO.
 When the issue is done:
 - Run tests

@@ -36,6 +36,11 @@ export type MoveRecord = LegalMove & {
   after: string;
 };
 
+export type BoardPiece = {
+  type: PieceSymbol;
+  color: Color;
+};
+
 export type MoveResult =
   | {
       ok: true;
@@ -66,6 +71,10 @@ export class ChessState {
 
   getSideToMove(): Color {
     return this.chess.turn();
+  }
+
+  getPiece(square: Square): BoardPiece | null {
+    return this.chess.get(square);
   }
 
   isInCheck(): boolean {
