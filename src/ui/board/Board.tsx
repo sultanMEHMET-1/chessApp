@@ -5,6 +5,7 @@ import {
   ChessState,
   type BoardPiece,
   type LegalMove,
+  type MoveRecord,
   type PromotionPiece
 } from "../../chess/chessState";
 import { applyMove } from "../../chess/selection";
@@ -13,6 +14,14 @@ import styles from "./Board.module.css";
 type BoardSquare = {
   square: Square;
   isDark: boolean;
+};
+
+type MoveRow = {
+  moveNumber: number;
+  whiteMove: MoveRecord;
+  blackMove?: MoveRecord;
+  whitePly: number;
+  blackPly?: number;
 };
 
 const BOARD_FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
@@ -29,6 +38,15 @@ const BOARD_RANKS_DESC = [
 const CHECKERBOARD_MODULO = 2;
 const DARK_SQUARE_PARITY = 1;
 const DEFAULT_PROMOTION: PromotionPiece = "q";
+
+const START_PLY_INDEX = 0;
+const START_HISTORY_INDEX = 0;
+const SINGLE_PLY = 1;
+const PLIES_PER_FULL_MOVE = 2;
+const FIRST_FULL_MOVE_NUMBER = 1;
+const FIRST_PLY_NUMBER = 1;
+const WHITE_PLY_OFFSET = 0;
+const BLACK_PLY_OFFSET = 1;
 
 const SIDE_LABELS: Record<Color, string> = {
   w: "White",
@@ -68,6 +86,23 @@ const BOARD_SQUARES: BoardSquare[] = BOARD_RANKS_DESC.flatMap(
 );
 
 const MOVE_ERROR_MESSAGE = "That move is not legal for the current position.";
+const HISTORY_TITLE = "Move History";
+const HISTORY_EMPTY_MESSAGE = "No moves yet.";
+const HISTORY_STATUS_LATEST = "Latest position.";
+const HISTORY_STATUS_START =
+  "Viewing start position. Return to latest to make moves.";
+const HISTORY_STATUS_VIEWING_PREFIX = "Viewing move";
+const HISTORY_STATUS_VIEWING_INFIX = "of";
+const HISTORY_STATUS_VIEWING_SUFFIX = "Return to latest to make moves.";
+const NAV_START_LABEL = "Start";
+const NAV_BACK_LABEL = "Back";
+const NAV_FORWARD_LABEL = "Forward";
+const NAV_END_LABEL = "End";
+const MOVE_NAVIGATION_LABEL = "Move navigation";
+const MOVE_HISTORY_LABEL = "Move history";
+const PENDING_MOVE_LABEL = "--";
+
+const MOVE_BUTTON_TEST_ID_PREFIX = "move";
 
 type BoardProps = {
   initialFen?: string;
@@ -75,27 +110,32 @@ type BoardProps = {
 
 export function Board({ initialFen }: BoardProps) {
   const [chessState] = useState(() => new ChessState(initialFen));
-  const [fen, setFen] = useState(() => chessState.getFen());
-  const [sideToMove, setSideToMove] = useState(() => chessState.getSideToMove());
-  const [isCheck, setIsCheck] = useState(() => chessState.isInCheck());
+  const [startFen] = useState(() => chessState.getFen());
+  const [currentPly, setCurrentPly] = useState(() => START_PLY_INDEX);
   const [selectedSquare, setSelectedSquare] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<LegalMove[]>([]);
-  const [lastMove, setLastMove] = useState<{
-    from: Square;
-    to: Square;
-  } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const history = chessState.getHistory();
+  const latestPly = history.length;
+  const isViewingLatest = currentPly === latestPly;
+  const viewFen =
+    currentPly === START_PLY_INDEX
+      ? startFen
+      : history[currentPly - SINGLE_PLY]?.after ?? startFen;
+  const viewState = useMemo(() => new ChessState(viewFen), [viewFen]);
+  const sideToMove = viewState.getSideToMove();
+  const isCheck = viewState.isInCheck();
+  const fen = viewState.getFen();
+  const lastMove =
+    currentPly === START_PLY_INDEX
+      ? null
+      : history[currentPly - SINGLE_PLY] ?? null;
 
   const legalDestinations = useMemo(
     () => new Set(legalMoves.map((move) => move.to)),
     [legalMoves]
   );
-
-  const refreshStatus = () => {
-    setFen(chessState.getFen());
-    setSideToMove(chessState.getSideToMove());
-    setIsCheck(chessState.isInCheck());
-  };
 
   const clearSelection = () => {
     setSelectedSquare(null);
@@ -105,6 +145,16 @@ export function Board({ initialFen }: BoardProps) {
   const selectSquare = (square: Square) => {
     setSelectedSquare(square);
     setLegalMoves(chessState.legalMovesForSquare(square));
+  };
+
+  const goToPly = (targetPly: number) => {
+    const clampedPly = Math.min(
+      Math.max(targetPly, START_PLY_INDEX),
+      latestPly
+    );
+    setCurrentPly(clampedPly);
+    clearSelection();
+    setErrorMessage(null);
   };
 
   const applySelectedMove = (destination: Square) => {
@@ -125,13 +175,16 @@ export function Board({ initialFen }: BoardProps) {
       return;
     }
 
-    setLastMove({ from: result.move.from, to: result.move.to });
-    refreshStatus();
+    setCurrentPly(latestPly + SINGLE_PLY);
     clearSelection();
     setErrorMessage(null);
   };
 
   const handleSquareClick = (square: Square) => {
+    if (!isViewingLatest) {
+      return;
+    }
+
     if (selectedSquare) {
       if (square === selectedSquare) {
         clearSelection();
@@ -144,7 +197,7 @@ export function Board({ initialFen }: BoardProps) {
       }
     }
 
-    const piece = chessState.getPiece(square);
+    const piece = viewState.getPiece(square);
 
     if (piece && piece.color === sideToMove) {
       selectSquare(square);
@@ -155,12 +208,17 @@ export function Board({ initialFen }: BoardProps) {
     clearSelection();
   };
 
+  const moveRows = buildMoveRows(history);
+  const historyStatus = buildHistoryStatus(currentPly, latestPly);
+  const canNavigateBack = currentPly > START_PLY_INDEX;
+  const canNavigateForward = currentPly < latestPly;
+
   return (
     <div className={styles.panel}>
       <div className={styles.boardWrapper}>
         <div className={styles.board} role="grid" aria-label="Chess board">
           {BOARD_SQUARES.map((squareData) => {
-            const piece = chessState.getPiece(squareData.square);
+            const piece = viewState.getPiece(squareData.square);
             const isSelected = selectedSquare === squareData.square;
             const isLegalDestination = legalDestinations.has(squareData.square);
             const isLastMove =
@@ -189,6 +247,7 @@ export function Board({ initialFen }: BoardProps) {
                   isLegalDestination ? "true" : undefined
                 }
                 data-last-move={isLastMove ? "true" : undefined}
+                disabled={!isViewingLatest}
               >
                 {piece ? (
                   <span
@@ -234,8 +293,151 @@ export function Board({ initialFen }: BoardProps) {
           {errorMessage}
         </p>
       ) : null}
+
+      <section className={styles.historyPanel} aria-label={MOVE_HISTORY_LABEL}>
+        <div className={styles.historyHeader}>
+          <div>
+            <h3 className={styles.historyTitle}>{HISTORY_TITLE}</h3>
+            <p className={styles.historyStatus} data-testid="history-status">
+              {historyStatus}
+            </p>
+          </div>
+          <div className={styles.historyNav} role="group" aria-label={MOVE_NAVIGATION_LABEL}>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={() => goToPly(START_PLY_INDEX)}
+              disabled={!canNavigateBack}
+              data-testid="nav-start"
+            >
+              {NAV_START_LABEL}
+            </button>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={() => goToPly(currentPly - SINGLE_PLY)}
+              disabled={!canNavigateBack}
+              data-testid="nav-back"
+            >
+              {NAV_BACK_LABEL}
+            </button>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={() => goToPly(currentPly + SINGLE_PLY)}
+              disabled={!canNavigateForward}
+              data-testid="nav-forward"
+            >
+              {NAV_FORWARD_LABEL}
+            </button>
+            <button
+              type="button"
+              className={styles.navButton}
+              onClick={() => goToPly(latestPly)}
+              disabled={!canNavigateForward}
+              data-testid="nav-end"
+            >
+              {NAV_END_LABEL}
+            </button>
+          </div>
+        </div>
+
+        {moveRows.length === START_PLY_INDEX ? (
+          <p className={styles.historyEmpty}>{HISTORY_EMPTY_MESSAGE}</p>
+        ) : (
+          <ol className={styles.historyList} data-testid="move-history">
+            {moveRows.map((row) => {
+              const isWhiteCurrent = currentPly === row.whitePly;
+              const isBlackCurrent = currentPly === row.blackPly;
+              const whiteClassName = [
+                styles.moveButton,
+                isWhiteCurrent ? styles.currentMove : ""
+              ]
+                .filter(Boolean)
+                .join(" ");
+              const blackClassName = [
+                styles.moveButton,
+                isBlackCurrent ? styles.currentMove : ""
+              ]
+                .filter(Boolean)
+                .join(" ");
+
+              return (
+                <li key={row.moveNumber} className={styles.historyRow}>
+                  <span className={styles.moveNumber}>{row.moveNumber}.</span>
+                  <button
+                    type="button"
+                    className={whiteClassName}
+                    onClick={() => goToPly(row.whitePly)}
+                    data-testid={`${MOVE_BUTTON_TEST_ID_PREFIX}-${row.whitePly}`}
+                    aria-current={isWhiteCurrent ? "true" : undefined}
+                  >
+                    {row.whiteMove.san}
+                  </button>
+                  {row.blackMove && row.blackPly ? (
+                    <button
+                      type="button"
+                      className={blackClassName}
+                      onClick={() => goToPly(row.blackPly)}
+                      data-testid={`${MOVE_BUTTON_TEST_ID_PREFIX}-${row.blackPly}`}
+                      aria-current={isBlackCurrent ? "true" : undefined}
+                    >
+                      {row.blackMove.san}
+                    </button>
+                  ) : (
+                    <span className={styles.pendingMove}>{PENDING_MOVE_LABEL}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </section>
     </div>
   );
+}
+
+function buildMoveRows(history: MoveRecord[]): MoveRow[] {
+  const rows: MoveRow[] = [];
+
+  for (
+    let index = START_HISTORY_INDEX;
+    index < history.length;
+    index += PLIES_PER_FULL_MOVE
+  ) {
+    const whiteMove = history[index + WHITE_PLY_OFFSET];
+
+    if (!whiteMove) {
+      continue;
+    }
+
+    const blackMove = history[index + BLACK_PLY_OFFSET];
+    const moveNumber = index / PLIES_PER_FULL_MOVE + FIRST_FULL_MOVE_NUMBER;
+    const whitePly = index + FIRST_PLY_NUMBER;
+    const blackPly = blackMove ? index + PLIES_PER_FULL_MOVE : undefined;
+
+    rows.push({
+      moveNumber,
+      whiteMove,
+      blackMove,
+      whitePly,
+      blackPly
+    });
+  }
+
+  return rows;
+}
+
+function buildHistoryStatus(currentPly: number, latestPly: number): string {
+  if (currentPly === latestPly) {
+    return HISTORY_STATUS_LATEST;
+  }
+
+  if (currentPly === START_PLY_INDEX) {
+    return HISTORY_STATUS_START;
+  }
+
+  return `${HISTORY_STATUS_VIEWING_PREFIX} ${currentPly} ${HISTORY_STATUS_VIEWING_INFIX} ${latestPly}. ${HISTORY_STATUS_VIEWING_SUFFIX}`;
 }
 
 function pickPromotion(moves: LegalMove[]): PromotionPiece | undefined {
