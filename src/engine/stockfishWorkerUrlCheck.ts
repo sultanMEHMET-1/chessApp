@@ -1,5 +1,6 @@
 import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Validates that Vite can resolve the Stockfish worker asset URL import.
@@ -34,7 +35,8 @@ function defaultResolveModule(id: string): string | null {
   }
 
   try {
-    return createRequire(import.meta.url).resolve(id);
+    const projectRequire = createRequire(join(process.cwd(), 'package.json'));
+    return projectRequire.resolve(id);
   } catch {
     return null;
   }
