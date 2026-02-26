@@ -10,6 +10,9 @@ import type { AnalysisSettings, EngineRequest, EngineResponse } from './types';
 const REQUEST_PREFIX = 'analysis';
 const REQUEST_COUNTER_START = 0;
 const WORKER_UNAVAILABLE_MESSAGE = 'Web Workers are not available in this environment.';
+const ENGINE_START_TIMEOUT_MS = 8000; // Guard against stalled engine startup.
+const ENGINE_START_TIMEOUT_MESSAGE =
+  'Stockfish did not become ready. Please restart the engine.';
 
 function buildRequestId(counter: number): string {
   return `${REQUEST_PREFIX}-${counter}`;
@@ -27,10 +30,25 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
   const workerRef = useRef<Worker | null>(null);
   const requestCounterRef = useRef(REQUEST_COUNTER_START);
   const activeRequestRef = useRef<{ requestId: string; fen: string } | null>(null);
+  const startupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sendMessage = useCallback((message: EngineRequest) => {
     workerRef.current?.postMessage(message);
   }, []);
+
+  const clearStartupTimeout = useCallback(() => {
+    if (startupTimeoutRef.current) {
+      clearTimeout(startupTimeoutRef.current);
+      startupTimeoutRef.current = null;
+    }
+  }, []);
+
+  const armStartupTimeout = useCallback(() => {
+    clearStartupTimeout();
+    startupTimeoutRef.current = setTimeout(() => {
+      dispatch({ type: 'error', message: ENGINE_START_TIMEOUT_MESSAGE });
+    }, ENGINE_START_TIMEOUT_MS);
+  }, [clearStartupTimeout]);
 
   const initializeWorker = useCallback(() => {
     if (workerRef.current) {
@@ -52,6 +70,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
         return;
       }
       if (response.type === 'ready') {
+        clearStartupTimeout();
         setIsReady(true);
         return;
       }
@@ -68,6 +87,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
         return;
       }
       if (response.type === 'error') {
+        clearStartupTimeout();
         dispatch({
           type: 'error',
           requestId: response.requestId,
@@ -78,6 +98,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
     };
 
     worker.onerror = () => {
+      clearStartupTimeout();
       dispatch({ type: 'error', message: 'Engine worker failed to start.' });
     };
 
@@ -94,6 +115,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
     workerRef.current = null;
     setIsReady(false);
     activeRequestRef.current = null;
+    clearStartupTimeout();
   }, [sendMessage]);
 
   useEffect(() => {
@@ -102,6 +124,17 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
       terminateWorker();
     };
   }, [initializeWorker, terminateWorker]);
+
+  useEffect(() => {
+    if (!enabled || isReady || state.status === 'error') {
+      clearStartupTimeout();
+      return;
+    }
+    armStartupTimeout();
+    return () => {
+      clearStartupTimeout();
+    };
+  }, [armStartupTimeout, clearStartupTimeout, enabled, isReady, state.status]);
 
   useEffect(() => {
     if (!enabled) {
