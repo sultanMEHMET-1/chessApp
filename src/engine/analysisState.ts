@@ -30,10 +30,17 @@ function createInitialAnalysisState(): AnalysisState {
 }
 
 function upsertLine(lines: AnalysisLine[], line: AnalysisLine): AnalysisLine[] {
-  const index = Math.max(line.multipv - 1, 0);
   const next = [...lines];
-  next[index] = line;
-  return next.slice(0, MAX_LINES);
+  const existingIndex = next.findIndex((entry) => entry.multipv === line.multipv);
+  if (existingIndex >= 0) {
+    next[existingIndex] = line;
+  } else {
+    next.push(line);
+  }
+
+  return next
+    .sort((left, right) => left.multipv - right.multipv)
+    .slice(0, MAX_LINES);
 }
 
 function analysisReducer(state: AnalysisState, action: AnalysisAction): AnalysisState {

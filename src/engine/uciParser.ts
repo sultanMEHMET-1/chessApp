@@ -1,7 +1,7 @@
 /**
  * UCI info line parsing helpers for analysis output.
  */
-import type { AnalysisLine, Score } from './types';
+import type { EngineAnalysisLine, Score } from './types';
 
 const TOKEN_SEPARATOR = /\s+/;
 const TOKEN_INFO = 'info';
@@ -103,7 +103,7 @@ function parseScore(tokens: string[], index: number): Score | null {
   return null;
 }
 
-export function parseUciInfoLine(line: string): AnalysisLine | null {
+export function parseUciInfoLine(line: string): EngineAnalysisLine | null {
   const tokens = line.trim().split(TOKEN_SEPARATOR);
   if (tokens.length < MIN_TOKENS || tokens[0] !== TOKEN_INFO) {
     return null;
