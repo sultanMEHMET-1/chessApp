@@ -10,6 +10,11 @@ const STOCKFISH_WORKER_ASSET_IMPORT = STOCKFISH_WORKER_URL_IMPORT.replace(
   '?url',
   ''
 );
+const STOCKFISH_PACKAGE_JSON_IMPORT = 'stockfish/package.json';
+const STOCKFISH_PACKAGE_ROOT = '/packages/stockfish';
+const STOCKFISH_PACKAGE_JSON_PATH = `${STOCKFISH_PACKAGE_ROOT}/package.json`;
+const STOCKFISH_WORKER_FROM_PACKAGE =
+  `${STOCKFISH_PACKAGE_ROOT}/src/stockfish-17.1-lite-single-03e3232.js`;
 const NO_FALLBACKS: ResolutionFallbacks = {
   resolveModule: () => null,
   fileExists: async () => false
@@ -76,5 +81,40 @@ describe('ensureStockfishWorkerUrlResolved', () => {
       STOCKFISH_WORKER_ASSET_IMPORT
     ]);
     expect(receivedModuleIds).toEqual([STOCKFISH_WORKER_ASSET_IMPORT]);
+  });
+
+  it('falls back to the package root when only package.json resolves', async () => {
+    const receivedIds: string[] = [];
+    const receivedModuleIds: string[] = [];
+    const checkedPaths: string[] = [];
+    const resolveId = async (id: string) => {
+      receivedIds.push(id);
+      return null;
+    };
+    const fallbacks: ResolutionFallbacks = {
+      resolveModule: (id) => {
+        receivedModuleIds.push(id);
+        if (id === STOCKFISH_PACKAGE_JSON_IMPORT) {
+          return `file://${STOCKFISH_PACKAGE_JSON_PATH}`;
+        }
+        return null;
+      },
+      fileExists: async (path) => {
+        checkedPaths.push(path);
+        return path === STOCKFISH_WORKER_FROM_PACKAGE;
+      }
+    };
+
+    await ensureStockfishWorkerUrlResolved(resolveId, fallbacks);
+
+    expect(receivedIds).toEqual([
+      STOCKFISH_WORKER_URL_IMPORT,
+      STOCKFISH_WORKER_ASSET_IMPORT
+    ]);
+    expect(receivedModuleIds).toEqual([
+      STOCKFISH_WORKER_ASSET_IMPORT,
+      STOCKFISH_PACKAGE_JSON_IMPORT
+    ]);
+    expect(checkedPaths).toContain(STOCKFISH_WORKER_FROM_PACKAGE);
   });
 });

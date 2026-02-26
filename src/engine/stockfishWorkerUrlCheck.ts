@@ -1,10 +1,13 @@
 import { access } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Validates that Vite can resolve the Stockfish worker asset URL import.
 // Keep this import specifier in sync with the Stockfish worker import.
+const STOCKFISH_PACKAGE_NAME = 'stockfish';
+const STOCKFISH_PACKAGE_PREFIX = `${STOCKFISH_PACKAGE_NAME}/`;
+const STOCKFISH_PACKAGE_JSON_IMPORT = `${STOCKFISH_PACKAGE_NAME}/package.json`;
 const STOCKFISH_WORKER_URL_QUERY = '?url';
 export const STOCKFISH_WORKER_URL_IMPORT =
   `stockfish/src/stockfish-17.1-lite-single-03e3232.js${STOCKFISH_WORKER_URL_QUERY}`;
@@ -12,6 +15,10 @@ const STOCKFISH_WORKER_ASSET_IMPORT = STOCKFISH_WORKER_URL_IMPORT.replace(
   STOCKFISH_WORKER_URL_QUERY,
   ''
 );
+const STOCKFISH_WORKER_ASSET_RELATIVE_PATH =
+  STOCKFISH_WORKER_ASSET_IMPORT.startsWith(STOCKFISH_PACKAGE_PREFIX)
+    ? STOCKFISH_WORKER_ASSET_IMPORT.slice(STOCKFISH_PACKAGE_PREFIX.length)
+    : STOCKFISH_WORKER_ASSET_IMPORT;
 
 const STOCKFISH_WORKER_URL_ERROR =
   `Stockfish worker URL could not be resolved for ${STOCKFISH_WORKER_URL_IMPORT}. ` +
@@ -71,6 +78,30 @@ async function resolveWithNode(
   return { id: resolvedPath };
 }
 
+async function resolveWithPackageRoot(
+  resolveModule: ResolveModule,
+  fileExists: FileExists
+): Promise<{ id: string } | null> {
+  const resolvedPackageJson = resolveModule(STOCKFISH_PACKAGE_JSON_IMPORT);
+  if (!resolvedPackageJson) {
+    return null;
+  }
+
+  const resolvedPackagePath = resolvedPackageJson.startsWith('file://')
+    ? fileURLToPath(resolvedPackageJson)
+    : resolvedPackageJson;
+  const candidate = join(
+    dirname(resolvedPackagePath),
+    STOCKFISH_WORKER_ASSET_RELATIVE_PATH
+  );
+
+  if (!(await fileExists(candidate))) {
+    return null;
+  }
+
+  return { id: candidate };
+}
+
 export async function ensureStockfishWorkerUrlResolved(
   resolveId: ResolveId,
   fallbacks: ResolutionFallbacks = {}
@@ -80,6 +111,10 @@ export async function ensureStockfishWorkerUrlResolved(
     (await resolveId(STOCKFISH_WORKER_ASSET_IMPORT)) ??
     (await resolveWithNode(
       STOCKFISH_WORKER_ASSET_IMPORT,
+      fallbacks.resolveModule ?? defaultResolveModule,
+      fallbacks.fileExists ?? defaultFileExists
+    )) ??
+    (await resolveWithPackageRoot(
       fallbacks.resolveModule ?? defaultResolveModule,
       fallbacks.fileExists ?? defaultFileExists
     ));

@@ -5,11 +5,26 @@ import { ensureStockfishWorkerUrlResolved } from './src/engine/stockfishWorkerUr
 const DEV_SERVER_PORT = 5173; // Vite default.
 
 function stockfishWorkerUrlCheck(): Plugin {
+  let shouldThrow = true;
+
   return {
     name: 'stockfish-worker-url-check',
     enforce: 'pre',
+    configResolved(config) {
+      shouldThrow = config.command === 'build';
+    },
     async buildStart() {
-      await ensureStockfishWorkerUrlResolved((id) => this.resolve(id));
+      try {
+        await ensureStockfishWorkerUrlResolved((id) => this.resolve(id));
+      } catch (error) {
+        if (shouldThrow) {
+          throw error;
+        }
+
+        const message =
+          error instanceof Error ? error.message : String(error);
+        this.warn(`${message} Skipping check for dev server startup.`);
+      }
     }
   };
 }
