@@ -160,14 +160,14 @@ function countKings(pieces: Record<string, BoardPiece | null>): { white: number;
 }
 
 function validateEditorPosition(position: EditorPosition): PositionValidation {
-  if (position.allowIllegal) {
-    return { ok: true };
-  }
-
   const fen = buildFen(position);
   const validation = validateFen(fen);
   if (!validation.ok) {
     return validation;
+  }
+
+  if (position.allowIllegal) {
+    return { ok: true };
   }
 
   const kings = countKings(position.pieces);
