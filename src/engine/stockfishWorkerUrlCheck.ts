@@ -1,14 +1,16 @@
 /**
  * Resolves Stockfish worker assets for Vite configuration and tests.
  */
-import { readdir } from 'node:fs/promises';
+import { access, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const STOCKFISH_PACKAGE_NAME = 'stockfish';
+const STOCKFISH_PACKAGE_ENTRY_IMPORT = STOCKFISH_PACKAGE_NAME;
 const STOCKFISH_PACKAGE_JSON_IMPORT = `${STOCKFISH_PACKAGE_NAME}/package.json`;
-const STOCKFISH_ASSET_DIR_NAME = 'src';
+const STOCKFISH_PACKAGE_JSON_NAME = 'package.json';
+const STOCKFISH_ASSET_DIR_CANDIDATES = ['src', 'dist', ''];
 const SCRIPT_EXTENSION = '.js';
 const WASM_EXTENSION = '.wasm';
 const DEFAULT_VARIANT_TOKEN = '';
@@ -20,13 +22,15 @@ const STOCKFISH_VARIANT_PREFERENCES = [
 
 export const STOCKFISH_WORKER_ASSETS_ERROR =
   'Stockfish worker assets could not be resolved. ' +
-  'Run pnpm install and verify the stockfish package provides JS and WASM assets under stockfish/src.';
+  'Run pnpm install and verify the stockfish package provides JS and WASM assets under stockfish/src, stockfish/dist, or the package root.';
 
 export type ResolveModule = (id: string) => string | null;
 export type ListFiles = (path: string) => Promise<string[]>;
+export type FileExists = (path: string) => Promise<boolean>;
 export type ResolutionFallbacks = {
   resolveModule?: ResolveModule;
   listFiles?: ListFiles;
+  fileExists?: FileExists;
 };
 
 export type StockfishWorkerAssetSelection = {
@@ -63,6 +67,15 @@ async function defaultListFiles(path: string): Promise<string[]> {
   return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
 }
 
+async function defaultFileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function normalizeResolvedPath(resolved: string): string {
   return resolved.startsWith('file://') ? fileURLToPath(resolved) : resolved;
 }
@@ -85,6 +98,26 @@ function buildBaseMap(files: string[], extension: string): Map<string, string> {
     map.set(base, name);
   }
   return map;
+}
+
+async function findPackageRootFromEntry(
+  entryPath: string,
+  fileExists: FileExists
+): Promise<string | null> {
+  let current = dirname(entryPath);
+
+  while (true) {
+    const candidate = join(current, STOCKFISH_PACKAGE_JSON_NAME);
+    if (await fileExists(candidate)) {
+      return current;
+    }
+
+    const parent = dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
 }
 
 export function selectStockfishWorkerAssets(
@@ -122,33 +155,53 @@ export async function resolveStockfishWorkerAssets(
 ): Promise<StockfishWorkerAssets | null> {
   const resolveModule = fallbacks.resolveModule ?? defaultResolveModule;
   const listFiles = fallbacks.listFiles ?? defaultListFiles;
+  const fileExists = fallbacks.fileExists ?? defaultFileExists;
+
+  let packageRoot: string | null = null;
 
   const resolvedPackageJson = resolveModule(STOCKFISH_PACKAGE_JSON_IMPORT);
-  if (!resolvedPackageJson) {
+  if (resolvedPackageJson) {
+    packageRoot = dirname(normalizeResolvedPath(resolvedPackageJson));
+  } else {
+    const resolvedEntry = resolveModule(STOCKFISH_PACKAGE_ENTRY_IMPORT);
+    if (resolvedEntry) {
+      packageRoot = await findPackageRootFromEntry(
+        normalizeResolvedPath(resolvedEntry),
+        fileExists
+      );
+    }
+  }
+
+  if (!packageRoot) {
     return null;
   }
 
-  const packageJsonPath = normalizeResolvedPath(resolvedPackageJson);
-  const packageRoot = dirname(packageJsonPath);
-  const assetDir = join(packageRoot, STOCKFISH_ASSET_DIR_NAME);
+  for (const dir of STOCKFISH_ASSET_DIR_CANDIDATES) {
+    const assetDir = dir ? join(packageRoot, dir) : packageRoot;
+    let files: string[] = [];
+    try {
+      files = await listFiles(assetDir);
+    } catch {
+      continue;
+    }
 
-  let files: string[] = [];
-  try {
-    files = await listFiles(assetDir);
-  } catch {
-    return null;
+    const scriptFiles = files.filter((file) =>
+      basename(file).endsWith(SCRIPT_EXTENSION)
+    );
+    const wasmFiles = files.filter((file) =>
+      basename(file).endsWith(WASM_EXTENSION)
+    );
+    const selection = selectStockfishWorkerAssets(scriptFiles, wasmFiles);
+    if (!selection) {
+      continue;
+    }
+
+    return {
+      baseName: selection.baseName,
+      scriptPath: join(assetDir, selection.scriptName),
+      wasmPath: join(assetDir, selection.wasmName)
+    };
   }
 
-  const scriptFiles = files.filter((file) => basename(file).endsWith(SCRIPT_EXTENSION));
-  const wasmFiles = files.filter((file) => basename(file).endsWith(WASM_EXTENSION));
-  const selection = selectStockfishWorkerAssets(scriptFiles, wasmFiles);
-  if (!selection) {
-    return null;
-  }
-
-  return {
-    baseName: selection.baseName,
-    scriptPath: join(assetDir, selection.scriptName),
-    wasmPath: join(assetDir, selection.wasmName)
-  };
+  return null;
 }
