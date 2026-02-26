@@ -18,12 +18,14 @@ const LINE_READY_UCI = 'uciok';
 const LINE_READY_OK = 'readyok';
 const WORKER_HASH_SUFFIX = 'worker';
 const WORKER_HASH_SEPARATOR = ',';
+const ENGINE_READY_TIMEOUT_MS = 8000; // Avoid indefinite "starting engine" when WASM fails to init.
 
 // Stockfish expects the wasm path via location.hash when running in a worker.
 let engineWorker: Worker | null = null;
 let activeRequestId: string | null = null;
 let missingAssetsReported = false;
 let engineReady = false;
+let readyTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 function post(response: EngineResponse) {
   self.postMessage(response);
@@ -39,6 +41,25 @@ function reportMissingAssets() {
     version: ENGINE_PROTOCOL_VERSION,
     message: stockfishEngineAssetsError
   });
+}
+
+function clearReadyTimeout() {
+  if (readyTimeoutId) {
+    clearTimeout(readyTimeoutId);
+    readyTimeoutId = null;
+  }
+}
+
+function armReadyTimeout() {
+  clearReadyTimeout();
+  readyTimeoutId = setTimeout(() => {
+    readyTimeoutId = null;
+    post({
+      type: 'error',
+      version: ENGINE_PROTOCOL_VERSION,
+      message: 'Stockfish did not become ready. Please restart the engine.'
+    });
+  }, ENGINE_READY_TIMEOUT_MS);
 }
 
 function buildStockfishWorkerUrl(scriptUrl: string, wasmUrl: string): string {
@@ -61,6 +82,7 @@ function attachEngineWorkerHandlers(worker: Worker) {
       if (line === LINE_READY_UCI || line === LINE_READY_OK) {
         if (!engineReady) {
           engineReady = true;
+          clearReadyTimeout();
           post({ type: 'ready', version: ENGINE_PROTOCOL_VERSION });
         }
         continue;
@@ -90,6 +112,7 @@ function attachEngineWorkerHandlers(worker: Worker) {
   };
 
   worker.onerror = () => {
+    clearReadyTimeout();
     post({
       type: 'error',
       version: ENGINE_PROTOCOL_VERSION,
@@ -109,14 +132,23 @@ function ensureEngineWorker(): Worker | null {
   }
 
   engineReady = false;
-  const stockfishWorkerUrl = buildStockfishWorkerUrl(
-    stockfishEngineScriptUrl,
-    stockfishEngineWasmUrl
-  );
-  const worker = new Worker(stockfishWorkerUrl, { type: 'classic' });
-  attachEngineWorkerHandlers(worker);
-  engineWorker = worker;
-  return worker;
+  try {
+    const stockfishWorkerUrl = buildStockfishWorkerUrl(
+      stockfishEngineScriptUrl,
+      stockfishEngineWasmUrl
+    );
+    const worker = new Worker(stockfishWorkerUrl, { type: 'classic' });
+    attachEngineWorkerHandlers(worker);
+    engineWorker = worker;
+    return worker;
+  } catch (error) {
+    post({
+      type: 'error',
+      version: ENGINE_PROTOCOL_VERSION,
+      message: 'Stockfish worker could not be created in this browser.'
+    });
+    return null;
+  }
 }
 
 function sendEngine(command: string) {
@@ -152,6 +184,7 @@ function startAnalysis(requestId: string, fen: string, settings: AnalysisSetting
 function stopAnalysis() {
   activeRequestId = null;
   sendEngine('stop');
+  clearReadyTimeout();
 }
 
 self.onmessage = (event: MessageEvent<EngineRequest>) => {
@@ -169,6 +202,7 @@ self.onmessage = (event: MessageEvent<EngineRequest>) => {
     if (!ensureEngineWorker()) {
       return;
     }
+    armReadyTimeout();
     sendEngine('uci');
     sendEngine('isready');
     return;
@@ -190,5 +224,6 @@ self.onmessage = (event: MessageEvent<EngineRequest>) => {
       engineWorker.terminate();
       engineWorker = null;
     }
+    clearReadyTimeout();
   }
 };
