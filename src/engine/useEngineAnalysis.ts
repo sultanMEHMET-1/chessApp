@@ -139,6 +139,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
 
   return {
     lines: state.lines,
+    requestId: state.requestId,
     status: state.status,
     error: state.error,
     restart
