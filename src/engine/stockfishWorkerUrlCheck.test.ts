@@ -1,120 +1,70 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type ResolutionFallbacks,
-  STOCKFISH_WORKER_URL_IMPORT,
-  ensureStockfishWorkerUrlResolved
+  resolveStockfishWorkerAssets,
+  selectStockfishWorkerAssets
 } from './stockfishWorkerUrlCheck';
 
-const RESOLVED_ID = '/assets/stockfish-worker.js';
-const STOCKFISH_WORKER_ASSET_IMPORT = STOCKFISH_WORKER_URL_IMPORT.replace(
-  '?url',
-  ''
-);
 const STOCKFISH_PACKAGE_JSON_IMPORT = 'stockfish/package.json';
 const STOCKFISH_PACKAGE_ROOT = '/packages/stockfish';
 const STOCKFISH_PACKAGE_JSON_PATH = `${STOCKFISH_PACKAGE_ROOT}/package.json`;
-const STOCKFISH_WORKER_FROM_PACKAGE =
-  `${STOCKFISH_PACKAGE_ROOT}/src/stockfish-17.1-lite-single-03e3232.js`;
-const NO_FALLBACKS: ResolutionFallbacks = {
-  resolveModule: () => null,
-  fileExists: async () => false
-};
+const STOCKFISH_ASSET_DIR = `${STOCKFISH_PACKAGE_ROOT}/src`;
 
-describe('ensureStockfishWorkerUrlResolved', () => {
-  it('uses the Stockfish worker URL import specifier', async () => {
-    let receivedId = '';
-    const resolveId = async (id: string) => {
-      receivedId = id;
-      return { id: RESOLVED_ID };
-    };
+describe('selectStockfishWorkerAssets', () => {
+  it('prefers lite-single when available', () => {
+    const selection = selectStockfishWorkerAssets(
+      ['stockfish-17.1-lite.js', 'stockfish-17.1-lite-single.js'],
+      ['stockfish-17.1-lite-single.wasm', 'stockfish-17.1-lite.wasm']
+    );
 
-    await ensureStockfishWorkerUrlResolved(resolveId, NO_FALLBACKS);
-
-    expect(receivedId).toBe(STOCKFISH_WORKER_URL_IMPORT);
+    expect(selection?.baseName).toBe('stockfish-17.1-lite-single');
   });
 
-  it('throws when the worker URL cannot be resolved', async () => {
-    const resolveId = async () => null;
+  it('falls back to lite when lite-single is missing', () => {
+    const selection = selectStockfishWorkerAssets(
+      ['stockfish-17.1-lite.js'],
+      ['stockfish-17.1-lite.wasm']
+    );
 
-    await expect(
-      ensureStockfishWorkerUrlResolved(resolveId, NO_FALLBACKS)
-    ).rejects.toThrow(/Stockfish worker URL could not be resolved/);
+    expect(selection?.baseName).toBe('stockfish-17.1-lite');
   });
 
-  it('falls back to resolving the asset path without the url query', async () => {
-    const receivedIds: string[] = [];
-    const resolveId = async (id: string) => {
-      receivedIds.push(id);
-      if (id === STOCKFISH_WORKER_ASSET_IMPORT) {
-        return { id: RESOLVED_ID };
-      }
-      return null;
-    };
+  it('returns null when no matching wasm pair exists', () => {
+    const selection = selectStockfishWorkerAssets(
+      ['stockfish-17.1-lite.js'],
+      ['stockfish-17.1.wasm']
+    );
 
-    await ensureStockfishWorkerUrlResolved(resolveId, NO_FALLBACKS);
+    expect(selection).toBeNull();
+  });
+});
 
-    expect(receivedIds).toEqual([
-      STOCKFISH_WORKER_URL_IMPORT,
-      STOCKFISH_WORKER_ASSET_IMPORT
-    ]);
+describe('resolveStockfishWorkerAssets', () => {
+  it('returns null when the package cannot be resolved', async () => {
+    const resolved = await resolveStockfishWorkerAssets({
+      resolveModule: () => null,
+      listFiles: async () => []
+    });
+
+    expect(resolved).toBeNull();
   });
 
-  it('falls back to the node resolver when Vite cannot resolve the asset', async () => {
-    const receivedIds: string[] = [];
-    const receivedModuleIds: string[] = [];
-    const resolveId = async (id: string) => {
-      receivedIds.push(id);
-      return null;
-    };
-    const fallbacks: ResolutionFallbacks = {
-      resolveModule: (id) => {
-        receivedModuleIds.push(id);
-        return `file://${RESOLVED_ID}`;
-      },
-      fileExists: async (path) => path === RESOLVED_ID
-    };
-
-    await ensureStockfishWorkerUrlResolved(resolveId, fallbacks);
-
-    expect(receivedIds).toEqual([
-      STOCKFISH_WORKER_URL_IMPORT,
-      STOCKFISH_WORKER_ASSET_IMPORT
-    ]);
-    expect(receivedModuleIds).toEqual([STOCKFISH_WORKER_ASSET_IMPORT]);
-  });
-
-  it('falls back to the package root when only package.json resolves', async () => {
-    const receivedIds: string[] = [];
-    const receivedModuleIds: string[] = [];
-    const checkedPaths: string[] = [];
-    const resolveId = async (id: string) => {
-      receivedIds.push(id);
-      return null;
-    };
-    const fallbacks: ResolutionFallbacks = {
-      resolveModule: (id) => {
-        receivedModuleIds.push(id);
-        if (id === STOCKFISH_PACKAGE_JSON_IMPORT) {
-          return `file://${STOCKFISH_PACKAGE_JSON_PATH}`;
+  it('builds full asset paths from the package root', async () => {
+    const resolved = await resolveStockfishWorkerAssets({
+      resolveModule: (id) => (id === STOCKFISH_PACKAGE_JSON_IMPORT
+        ? STOCKFISH_PACKAGE_JSON_PATH
+        : null),
+      listFiles: async (path) => {
+        if (path !== STOCKFISH_ASSET_DIR) {
+          throw new Error(`Unexpected path: ${path}`);
         }
-        return null;
-      },
-      fileExists: async (path) => {
-        checkedPaths.push(path);
-        return path === STOCKFISH_WORKER_FROM_PACKAGE;
+        return ['stockfish-17.1-lite-single.js', 'stockfish-17.1-lite-single.wasm'];
       }
-    };
+    });
 
-    await ensureStockfishWorkerUrlResolved(resolveId, fallbacks);
-
-    expect(receivedIds).toEqual([
-      STOCKFISH_WORKER_URL_IMPORT,
-      STOCKFISH_WORKER_ASSET_IMPORT
-    ]);
-    expect(receivedModuleIds).toEqual([
-      STOCKFISH_WORKER_ASSET_IMPORT,
-      STOCKFISH_PACKAGE_JSON_IMPORT
-    ]);
-    expect(checkedPaths).toContain(STOCKFISH_WORKER_FROM_PACKAGE);
+    expect(resolved).toEqual({
+      baseName: 'stockfish-17.1-lite-single',
+      scriptPath: `${STOCKFISH_ASSET_DIR}/stockfish-17.1-lite-single.js`,
+      wasmPath: `${STOCKFISH_ASSET_DIR}/stockfish-17.1-lite-single.wasm`
+    });
   });
 });

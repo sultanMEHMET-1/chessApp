@@ -5,27 +5,111 @@
 import { ENGINE_PROTOCOL_VERSION } from './types';
 import type { AnalysisSettings, EngineRequest, EngineResponse } from './types';
 import { parseUciInfoLine } from './uciParser';
-import stockfishEngineScriptUrl from 'stockfish/src/stockfish-17.1-lite-single-03e3232.js?url';
-import stockfishEngineWasmUrl from 'stockfish/src/stockfish-17.1-lite-single-03e3232.wasm?url';
+import {
+  stockfishEngineAssetsAvailable,
+  stockfishEngineAssetsError,
+  stockfishEngineScriptUrl,
+  stockfishEngineWasmUrl
+} from 'virtual:stockfish-assets';
 
 const LINE_PREFIX_INFO = 'info';
 const LINE_PREFIX_BESTMOVE = 'bestmove';
 const LINE_READY = 'uciok';
 const WORKER_HASH_SUFFIX = 'worker';
+const WORKER_HASH_SEPARATOR = ',';
 
 // Stockfish expects the wasm path via location.hash when running in a worker.
-const stockfishWorkerUrl = `${stockfishEngineScriptUrl}#${encodeURIComponent(
-  stockfishEngineWasmUrl
-)},${WORKER_HASH_SUFFIX}`;
-
-const engineWorker = new Worker(stockfishWorkerUrl, { type: 'classic' });
+let engineWorker: Worker | null = null;
 let activeRequestId: string | null = null;
+let missingAssetsReported = false;
 
 function post(response: EngineResponse) {
   self.postMessage(response);
 }
 
+function reportMissingAssets() {
+  if (missingAssetsReported) {
+    return;
+  }
+  missingAssetsReported = true;
+  post({
+    type: 'error',
+    version: ENGINE_PROTOCOL_VERSION,
+    message: stockfishEngineAssetsError
+  });
+}
+
+function buildStockfishWorkerUrl(scriptUrl: string, wasmUrl: string): string {
+  return `${scriptUrl}#${encodeURIComponent(wasmUrl)}${WORKER_HASH_SEPARATOR}${WORKER_HASH_SUFFIX}`;
+}
+
+function attachEngineWorkerHandlers(worker: Worker) {
+  worker.onmessage = (event: MessageEvent<string>) => {
+    const line = event.data;
+    if (typeof line !== 'string') {
+      return;
+    }
+
+    if (line === LINE_READY) {
+      post({ type: 'ready', version: ENGINE_PROTOCOL_VERSION });
+      return;
+    }
+
+    if (line.startsWith(LINE_PREFIX_INFO)) {
+      const parsed = parseUciInfoLine(line);
+      if (parsed && activeRequestId) {
+        post({
+          type: 'analysis',
+          version: ENGINE_PROTOCOL_VERSION,
+          requestId: activeRequestId,
+          line: parsed
+        });
+      }
+      return;
+    }
+
+    if (line.startsWith(LINE_PREFIX_BESTMOVE) && activeRequestId) {
+      post({
+        type: 'done',
+        version: ENGINE_PROTOCOL_VERSION,
+        requestId: activeRequestId
+      });
+    }
+  };
+
+  worker.onerror = () => {
+    post({
+      type: 'error',
+      version: ENGINE_PROTOCOL_VERSION,
+      message: 'Stockfish worker failed to start.'
+    });
+  };
+}
+
+function ensureEngineWorker(): Worker | null {
+  if (engineWorker) {
+    return engineWorker;
+  }
+
+  if (!stockfishEngineAssetsAvailable) {
+    reportMissingAssets();
+    return null;
+  }
+
+  const stockfishWorkerUrl = buildStockfishWorkerUrl(
+    stockfishEngineScriptUrl,
+    stockfishEngineWasmUrl
+  );
+  const worker = new Worker(stockfishWorkerUrl, { type: 'classic' });
+  attachEngineWorkerHandlers(worker);
+  engineWorker = worker;
+  return worker;
+}
+
 function sendEngine(command: string) {
+  if (!engineWorker) {
+    return;
+  }
   engineWorker.postMessage(command);
 }
 
@@ -40,6 +124,10 @@ function buildGoCommand(settings: AnalysisSettings): string {
 }
 
 function startAnalysis(requestId: string, fen: string, settings: AnalysisSettings) {
+  if (!ensureEngineWorker()) {
+    activeRequestId = null;
+    return;
+  }
   activeRequestId = requestId;
   sendEngine('stop');
   sendEngine('ucinewgame');
@@ -53,47 +141,6 @@ function stopAnalysis() {
   sendEngine('stop');
 }
 
-engineWorker.onmessage = (event: MessageEvent<string>) => {
-  const line = event.data;
-  if (typeof line !== 'string') {
-    return;
-  }
-
-  if (line === LINE_READY) {
-    post({ type: 'ready', version: ENGINE_PROTOCOL_VERSION });
-    return;
-  }
-
-  if (line.startsWith(LINE_PREFIX_INFO)) {
-    const parsed = parseUciInfoLine(line);
-    if (parsed && activeRequestId) {
-      post({
-        type: 'analysis',
-        version: ENGINE_PROTOCOL_VERSION,
-        requestId: activeRequestId,
-        line: parsed
-      });
-    }
-    return;
-  }
-
-  if (line.startsWith(LINE_PREFIX_BESTMOVE) && activeRequestId) {
-    post({
-      type: 'done',
-      version: ENGINE_PROTOCOL_VERSION,
-      requestId: activeRequestId
-    });
-  }
-};
-
-engineWorker.onerror = () => {
-  post({
-    type: 'error',
-    version: ENGINE_PROTOCOL_VERSION,
-    message: 'Stockfish worker failed to start.'
-  });
-};
-
 self.onmessage = (event: MessageEvent<EngineRequest>) => {
   const message = event.data;
   if (message.version !== ENGINE_PROTOCOL_VERSION) {
@@ -106,6 +153,9 @@ self.onmessage = (event: MessageEvent<EngineRequest>) => {
   }
 
   if (message.type === 'init') {
+    if (!ensureEngineWorker()) {
+      return;
+    }
     sendEngine('uci');
     return;
   }
@@ -122,6 +172,9 @@ self.onmessage = (event: MessageEvent<EngineRequest>) => {
 
   if (message.type === 'quit') {
     stopAnalysis();
-    engineWorker.terminate();
+    if (engineWorker) {
+      engineWorker.terminate();
+      engineWorker = null;
+    }
   }
 };
