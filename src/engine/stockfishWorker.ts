@@ -14,7 +14,8 @@ import {
 
 const LINE_PREFIX_INFO = 'info';
 const LINE_PREFIX_BESTMOVE = 'bestmove';
-const LINE_READY = 'uciok';
+const LINE_READY_UCI = 'uciok';
+const LINE_READY_OK = 'readyok';
 const WORKER_HASH_SUFFIX = 'worker';
 const WORKER_HASH_SEPARATOR = ',';
 
@@ -22,6 +23,7 @@ const WORKER_HASH_SEPARATOR = ',';
 let engineWorker: Worker | null = null;
 let activeRequestId: string | null = null;
 let missingAssetsReported = false;
+let engineReady = false;
 
 function post(response: EngineResponse) {
   self.postMessage(response);
@@ -45,35 +47,45 @@ function buildStockfishWorkerUrl(scriptUrl: string, wasmUrl: string): string {
 
 function attachEngineWorkerHandlers(worker: Worker) {
   worker.onmessage = (event: MessageEvent<string>) => {
-    const line = event.data;
-    if (typeof line !== 'string') {
+    const payload = event.data;
+    if (typeof payload !== 'string') {
       return;
     }
 
-    if (line === LINE_READY) {
-      post({ type: 'ready', version: ENGINE_PROTOCOL_VERSION });
-      return;
-    }
+    const lines = payload
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
 
-    if (line.startsWith(LINE_PREFIX_INFO)) {
-      const parsed = parseUciInfoLine(line);
-      if (parsed && activeRequestId) {
+    for (const line of lines) {
+      if (line === LINE_READY_UCI || line === LINE_READY_OK) {
+        if (!engineReady) {
+          engineReady = true;
+          post({ type: 'ready', version: ENGINE_PROTOCOL_VERSION });
+        }
+        continue;
+      }
+
+      if (line.startsWith(LINE_PREFIX_INFO)) {
+        const parsed = parseUciInfoLine(line);
+        if (parsed && activeRequestId) {
+          post({
+            type: 'analysis',
+            version: ENGINE_PROTOCOL_VERSION,
+            requestId: activeRequestId,
+            line: parsed
+          });
+        }
+        continue;
+      }
+
+      if (line.startsWith(LINE_PREFIX_BESTMOVE) && activeRequestId) {
         post({
-          type: 'analysis',
+          type: 'done',
           version: ENGINE_PROTOCOL_VERSION,
-          requestId: activeRequestId,
-          line: parsed
+          requestId: activeRequestId
         });
       }
-      return;
-    }
-
-    if (line.startsWith(LINE_PREFIX_BESTMOVE) && activeRequestId) {
-      post({
-        type: 'done',
-        version: ENGINE_PROTOCOL_VERSION,
-        requestId: activeRequestId
-      });
     }
   };
 
@@ -96,6 +108,7 @@ function ensureEngineWorker(): Worker | null {
     return null;
   }
 
+  engineReady = false;
   const stockfishWorkerUrl = buildStockfishWorkerUrl(
     stockfishEngineScriptUrl,
     stockfishEngineWasmUrl
@@ -157,6 +170,7 @@ self.onmessage = (event: MessageEvent<EngineRequest>) => {
       return;
     }
     sendEngine('uci');
+    sendEngine('isready');
     return;
   }
 
