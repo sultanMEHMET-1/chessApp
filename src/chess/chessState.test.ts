@@ -5,13 +5,13 @@ import type { Square } from 'chess.js';
 const START_FEN =
   'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 const ILLEGAL_MOVE: MoveInput = { from: 'e2', to: 'e5' };
-const PINNED_ROOK_FEN = '4r3/8/8/8/8/8/4R3/4K3 w - - 0 1';
+const PINNED_ROOK_FEN = 'k3r3/8/8/8/8/8/4R3/4K3 w - - 0 1';
 const PINNED_ROOK_SQUARE: Square = 'e2';
 const PINNED_ILLEGAL_DESTINATION: Square = 'a2';
 const CASTLING_THROUGH_CHECK_FEN = 'r3k2r/8/8/8/2b5/8/8/R3K2R w KQkq - 0 1';
 const CASTLING_KING_SQUARE: Square = 'e1';
 const CASTLING_DESTINATION: Square = 'g1';
-const EN_PASSANT_EXPOSES_KING_FEN = '4r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1';
+const EN_PASSANT_EXPOSES_KING_FEN = 'k3r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1';
 const EN_PASSANT_PAWN_SQUARE: Square = 'e5';
 const EN_PASSANT_DESTINATION: Square = 'd6';
 const PROMOTION_FEN = '4k3/P7/8/8/8/8/8/4K3 w - - 0 1';
