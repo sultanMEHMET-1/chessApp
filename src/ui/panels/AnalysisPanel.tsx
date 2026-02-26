@@ -94,7 +94,15 @@ function AnalysisPanel({
               <span>#{line.multipv} {formatScore(line)}</span>
               <span>Depth {line.depth}</span>
             </div>
-            <div className={styles.linePv}>{line.pv.join(' ')}</div>
+            <div className={styles.bestMove}>
+              Best: {line.bestMoveSan || line.bestMoveUci}
+              {line.bestMoveUci && line.bestMoveSan && line.bestMoveSan !== line.bestMoveUci && (
+                <span className={styles.bestMoveUci}>({line.bestMoveUci})</span>
+              )}
+            </div>
+            <div className={styles.linePv}>
+              {(line.pvSan.length ? line.pvSan : line.pvUci).join(' ')}
+            </div>
           </div>
         ))}
         {lines.length === 0 && <span>No analysis yet.</span>}
