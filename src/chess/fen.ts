@@ -1,7 +1,7 @@
 /**
  * FEN parsing and editor helpers for position setup flows.
  */
-import { Square, validateFen } from 'chess.js';
+import { Chess, Square, validateFen } from 'chess.js';
 import {
   ALL_SQUARES,
   FILES,
@@ -21,8 +21,13 @@ import type {
 const CASTLING_NONE = '-';
 const EN_PASSANT_NONE = '-';
 const FEN_PARTS_COUNT = 6; // FEN standard has 6 fields.
+const FEN_TURN_INDEX = 1; // Active color field index in a 6-part FEN.
+const FEN_EN_PASSANT_INDEX = 3; // En passant field index in a 6-part FEN.
 const BOARD_EMPTY_THRESHOLD = 0; // No empty squares counted yet.
 const MAX_EMPTY_RUN = 8; // A rank can have up to 8 empty squares.
+const KING_COUNT_ERROR = 'Each side must have exactly one king.';
+const BOTH_KINGS_CHECK_ERROR = 'Both kings cannot be in check at the same time.';
+const INVALID_POSITION_ERROR = 'Position cannot be loaded.';
 
 function createEmptyPieceMap(): Record<Square, BoardPiece | null> {
   return ALL_SQUARES.reduce((accumulator, square) => {
@@ -134,6 +139,33 @@ function createEditorPositionFromFen(fen: string): EditorPosition {
   };
 }
 
+function buildCheckFen(fen: string, turn: PlayerColor): string {
+  const parts = fen.split(' ');
+  if (parts.length !== FEN_PARTS_COUNT) {
+    return fen;
+  }
+  parts[FEN_TURN_INDEX] = turn;
+  parts[FEN_EN_PASSANT_INDEX] = EN_PASSANT_NONE;
+  return parts.join(' ');
+}
+
+function isKingInCheck(fen: string, turn: PlayerColor): boolean {
+  const checkFen = buildCheckFen(fen, turn);
+  const game = new Chess(checkFen);
+  return game.isCheck();
+}
+
+function hasBothKingsInCheck(fen: string): boolean {
+  return isKingInCheck(fen, 'w') && isKingInCheck(fen, 'b');
+}
+
+function toValidationResult(message: string, allowIllegal: boolean): PositionValidation {
+  if (allowIllegal) {
+    return { ok: true, warning: message };
+  }
+  return { ok: false, error: message };
+}
+
 function buildFen(position: EditorPosition): string {
   const board = buildBoardString(position.pieces);
   const castling = stringifyCastlingRights(position.castling);
@@ -163,16 +195,16 @@ function validateEditorPosition(position: EditorPosition): PositionValidation {
   const fen = buildFen(position);
   const validation = validateFen(fen);
   if (!validation.ok) {
-    return validation;
-  }
-
-  if (position.allowIllegal) {
-    return { ok: true };
+    return { ok: false, error: validation.error ?? INVALID_POSITION_ERROR };
   }
 
   const kings = countKings(position.pieces);
   if (kings.white !== 1 || kings.black !== 1) {
-    return { ok: false, error: 'Each side must have exactly one king.' };
+    return toValidationResult(KING_COUNT_ERROR, position.allowIllegal);
+  }
+
+  if (hasBothKingsInCheck(fen)) {
+    return toValidationResult(BOTH_KINGS_CHECK_ERROR, position.allowIllegal);
   }
 
   return { ok: true };

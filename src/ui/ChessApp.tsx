@@ -85,6 +85,13 @@ function ChessApp({ initialFen = DEFAULT_STARTING_FEN }: ChessAppProps) {
     settings: analysisSettings
   });
 
+  const editorValidation = useMemo(
+    () => validateEditorPosition(editorPosition),
+    [editorPosition]
+  );
+  const editorWarning =
+    editorActive && editorValidation.ok ? editorValidation.warning : undefined;
+
   const clearSelection = useCallback(() => {
     setSelectedSquare(null);
     setLegalMoves([]);
@@ -191,6 +198,11 @@ function ChessApp({ initialFen = DEFAULT_STARTING_FEN }: ChessAppProps) {
     },
     [clearSelection, currentFen]
   );
+
+  const handleUpdateEditor = useCallback((next: typeof editorPosition) => {
+    setEditorPosition(next);
+    setEditorError(undefined);
+  }, []);
 
   const handleApplyEditor = useCallback(() => {
     const validation = validateEditorPosition(editorPosition);
@@ -300,9 +312,10 @@ function ChessApp({ initialFen = DEFAULT_STARTING_FEN }: ChessAppProps) {
               selectedPiece={selectedEditorPiece}
               isActive={editorActive}
               error={editorError}
+              warning={editorWarning}
               onToggleActive={handleToggleEditor}
               onSelectPiece={setSelectedEditorPiece}
-              onUpdateEditor={setEditorPosition}
+              onUpdateEditor={handleUpdateEditor}
               onApply={handleApplyEditor}
             />
           </section>
