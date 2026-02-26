@@ -5,6 +5,8 @@ const CENTIPAWN_SCALE = 100; // Convert centipawns to pawn units.
 const PAWN_DECIMALS = 2; // Show two decimals for evaluation.
 const MIN_ANALYSIS_VALUE = 1; // Analysis settings must be positive.
 const REQUEST_ID_IDLE = 'idle'; // Placeholder when analysis is not running.
+const FAST_ANALYSIS_MODE: AnalysisMode = 'time';
+const FAST_ANALYSIS_VALUE_MS = 300; // Quick preset for faster feedback.
 
 const ANALYSIS_MODES: Array<{ value: AnalysisMode; label: string }> = [
   { value: 'depth', label: 'Depth' },
@@ -19,6 +21,7 @@ type AnalysisPanelProps = {
   lines: AnalysisLine[];
   status: 'idle' | 'running' | 'error';
   error?: string;
+  isReady: boolean;
   requestId: string | null;
   onToggle: (enabled: boolean) => void;
   onModeChange: (mode: AnalysisMode) => void;
@@ -42,12 +45,15 @@ function AnalysisPanel({
   lines,
   status,
   error,
+  isReady,
   requestId,
   onToggle,
   onModeChange,
   onValueChange,
   onRestart
 }: AnalysisPanelProps) {
+  const showLoading = enabled && !error && lines.length === 0;
+  const loadingLabel = isReady ? 'Analyzing' : 'Starting engine';
   return (
     <div
       className={styles.panel}
@@ -83,6 +89,16 @@ function AnalysisPanel({
           onChange={(event) => onValueChange(Number(event.target.value))}
           data-testid="analysis-value"
         />
+        <button
+          type="button"
+          className={styles.presetButton}
+          onClick={() => {
+            onModeChange(FAST_ANALYSIS_MODE);
+            onValueChange(FAST_ANALYSIS_VALUE_MS);
+          }}
+        >
+          Fast {FAST_ANALYSIS_VALUE_MS}ms
+        </button>
         {status === 'error' && (
           <button type="button" className={styles.controlButton} onClick={onRestart}>
             Restart Engine
@@ -91,6 +107,17 @@ function AnalysisPanel({
       </div>
       {error && <div className={styles.error}>{error}</div>}
       <div className={styles.lineList}>
+        {showLoading && (
+          <div className={styles.loadingRow} data-testid="analysis-loading">
+            <span className={styles.spinner} aria-hidden="true" />
+            <span className={styles.loadingLabel}>{loadingLabel}</span>
+            <span className={styles.loadingDots} aria-hidden="true">
+              <span className={styles.loadingDot} />
+              <span className={styles.loadingDot} />
+              <span className={styles.loadingDot} />
+            </span>
+          </div>
+        )}
         {lines.map((line) => (
           <div
             key={line.multipv}
@@ -112,7 +139,7 @@ function AnalysisPanel({
             </div>
           </div>
         ))}
-        {lines.length === 0 && <span>No analysis yet.</span>}
+        {lines.length === 0 && !showLoading && <span>No analysis yet.</span>}
       </div>
     </div>
   );

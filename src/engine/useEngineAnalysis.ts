@@ -142,6 +142,7 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
     requestId: state.requestId,
     status: state.status,
     error: state.error,
+    isReady,
     restart
   };
 }
