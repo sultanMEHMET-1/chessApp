@@ -1,7 +1,12 @@
 import { ENGINE_PROTOCOL_VERSION } from './types';
 import type { AnalysisSettings, EngineRequest, EngineResponse } from './types';
 import { parseUciInfoLine } from './uciParser';
-import stockfishWorkerUrl from 'stockfish/src/stockfish-17.1-lite-single-03e3232.js?url';
+
+const STOCKFISH_WORKER_GLOB = '/node_modules/stockfish/src/stockfish-*-lite-single-*.js';
+// Resolve the hashed Stockfish worker file without hardcoding the build hash.
+const stockfishWorkerUrl = resolveStockfishWorkerUrl(
+  import.meta.glob<string>(STOCKFISH_WORKER_GLOB, { eager: true, as: 'url' })
+);
 
 const LINE_PREFIX_INFO = 'info';
 const LINE_PREFIX_BESTMOVE = 'bestmove';
@@ -9,6 +14,23 @@ const LINE_READY = 'uciok';
 
 const engineWorker = new Worker(stockfishWorkerUrl, { type: 'classic' });
 let activeRequestId: string | null = null;
+
+function resolveStockfishWorkerUrl(candidates: Record<string, string>): string {
+  const entries = Object.entries(candidates);
+  if (entries.length === 0) {
+    throw new Error(
+      `Stockfish worker asset not found. Expected one file matching ${STOCKFISH_WORKER_GLOB}.`
+    );
+  }
+  if (entries.length > 1) {
+    const matches = entries.map(([path]) => path).sort().join(', ');
+    throw new Error(
+      `Multiple Stockfish worker assets matched ${STOCKFISH_WORKER_GLOB}. ` +
+        `Expected exactly one file. Found: ${matches}.`
+    );
+  }
+  return entries[0][1];
+}
 
 function post(response: EngineResponse) {
   self.postMessage(response);
