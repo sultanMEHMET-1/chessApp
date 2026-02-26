@@ -9,9 +9,23 @@ const STOCKFISH_PACKAGE_JSON_IMPORT = 'stockfish/package.json';
 const STOCKFISH_ALIAS_PATTERN = /^stockfish\//;
 
 const projectRequire = createRequire(import.meta.url);
-const stockfishPackageRoot = dirname(
-  projectRequire.resolve(STOCKFISH_PACKAGE_JSON_IMPORT)
-);
+let stockfishPackageRoot: string | null = null;
+try {
+  stockfishPackageRoot = dirname(
+    projectRequire.resolve(STOCKFISH_PACKAGE_JSON_IMPORT)
+  );
+} catch {
+  stockfishPackageRoot = null;
+}
+
+const stockfishAlias = stockfishPackageRoot
+  ? [
+      {
+        find: STOCKFISH_ALIAS_PATTERN,
+        replacement: `${stockfishPackageRoot}/`
+      }
+    ]
+  : [];
 
 function stockfishWorkerUrlCheck(): Plugin {
   let shouldThrow = true;
@@ -41,12 +55,7 @@ function stockfishWorkerUrlCheck(): Plugin {
 export default defineConfig({
   plugins: [stockfishWorkerUrlCheck(), react()],
   resolve: {
-    alias: [
-      {
-        find: STOCKFISH_ALIAS_PATTERN,
-        replacement: `${stockfishPackageRoot}/`
-      }
-    ]
+    alias: stockfishAlias
   },
   server: {
     port: DEV_SERVER_PORT
