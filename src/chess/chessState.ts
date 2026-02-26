@@ -1,10 +1,20 @@
-import { Chess, type Color, type Move, type PieceSymbol, type Square } from 'chess.js';
+import {
+  Chess,
+  validateFen,
+  type Color,
+  type Move,
+  type PieceSymbol,
+  type Square
+} from 'chess.js';
 
 // Wraps chess.js as the single source of truth for position state and legality.
 const FEN_FIELD_COUNT = 6;
 const HALF_MOVE_CLOCK_FIELD_INDEX = 4;
 const MIN_HALF_MOVE_CLOCK_PLY = 0;
 const FEN_FIELD_SEPARATOR = /\s+/;
+const EMPTY_PGN_MESSAGE = 'Paste a PGN to import.';
+const INVALID_PGN_MESSAGE =
+  'PGN could not be parsed. Check move text like "1. e4 e5".';
 
 export type PromotionPiece = 'q' | 'r' | 'b' | 'n';
 
@@ -57,6 +67,28 @@ export type DrawStatus = {
   fiftyMoveRule: boolean;
   insufficientMaterial: boolean;
 };
+
+export type FenLoadResult =
+  | {
+      ok: true;
+      fen: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+export type PgnImportResult =
+  | {
+      ok: true;
+      history: MoveRecord[];
+      startFen: string;
+      finalFen: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
 
 export class ChessState {
   private readonly chess: Chess;
@@ -134,6 +166,69 @@ export class ChessState {
   getHistory(): MoveRecord[] {
     const history = this.chess.history({ verbose: true });
     return history.map(toMoveRecord);
+  }
+
+  loadFen(fen: string): FenLoadResult {
+    const trimmed = fen.trim();
+    const validation = validateFen(trimmed);
+
+    if (!validation.ok) {
+      return {
+        ok: false,
+        error: `Invalid FEN: ${validation.error ?? trimmed}`
+      };
+    }
+
+    const loaded = this.chess.load(trimmed);
+
+    if (!loaded) {
+      return {
+        ok: false,
+        error: `Invalid FEN: ${trimmed}`
+      };
+    }
+
+    return {
+      ok: true,
+      fen: this.chess.fen()
+    };
+  }
+
+  loadPgn(rawPgn: string): PgnImportResult {
+    const trimmed = rawPgn.trim();
+
+    if (!trimmed) {
+      return {
+        ok: false,
+        error: EMPTY_PGN_MESSAGE
+      };
+    }
+
+    const candidate = new Chess();
+
+    try {
+      candidate.loadPgn(trimmed);
+    } catch {
+      return {
+        ok: false,
+        error: INVALID_PGN_MESSAGE
+      };
+    }
+
+    const history = candidate
+      .history({ verbose: true })
+      .map(toMoveRecord);
+    const startFen = history.length > 0 ? history[0].before : candidate.fen();
+    const finalFen = candidate.fen();
+
+    this.chess.loadPgn(trimmed);
+
+    return {
+      ok: true,
+      history,
+      startFen,
+      finalFen
+    };
   }
 }
 

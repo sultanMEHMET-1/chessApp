@@ -43,6 +43,13 @@ const THREEFOLD_SEQUENCE: MoveInput[] = [
 const FIFTY_MOVE_FEN = '8/8/8/8/8/8/8/4K2k w - - 100 1';
 const FIFTY_MOVE_HALF_MOVE_CLOCK = 100;
 const INSUFFICIENT_MATERIAL_FEN = '8/8/8/8/8/8/8/4K2k w - - 0 1';
+const EMPTY_PGN = '   ';
+const INVALID_PGN = '1. e4 e5 2. Qz4';
+const VALID_PGN = '1. e4 e5 2. Nf3 Nc6';
+const EXPECTED_PGN_HISTORY_LENGTH = 4;
+const EMPTY_PGN_ERROR = 'Paste a PGN to import.';
+const INVALID_PGN_ERROR =
+  'PGN could not be parsed. Check move text like "1. e4 e5".';
 
 function expectMoveOk(state: ChessState, input: MoveInput): void {
   const result = state.makeMove(input);
@@ -122,5 +129,35 @@ describe('ChessState', () => {
     const state = new ChessState(INSUFFICIENT_MATERIAL_FEN);
 
     expect(state.isInsufficientMaterial()).toBe(true);
+  });
+
+  it('rejects empty PGN imports with a helpful message', () => {
+    const state = new ChessState();
+    const result = state.loadPgn(EMPTY_PGN);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe(EMPTY_PGN_ERROR);
+    }
+  });
+
+  it('rejects invalid PGN imports with a helpful message', () => {
+    const state = new ChessState();
+    const result = state.loadPgn(INVALID_PGN);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe(INVALID_PGN_ERROR);
+    }
+  });
+
+  it('accepts valid PGN imports and captures the history', () => {
+    const state = new ChessState();
+    const result = state.loadPgn(VALID_PGN);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.history).toHaveLength(EXPECTED_PGN_HISTORY_LENGTH);
+    }
   });
 });
