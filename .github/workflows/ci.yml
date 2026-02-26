@@ -22,6 +22,6 @@ jobs:
           node-version: 20
           cache: pnpm
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
       - name: Unit tests
         run: pnpm test
