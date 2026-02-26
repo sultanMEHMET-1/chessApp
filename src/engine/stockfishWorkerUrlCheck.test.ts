@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type ResolutionFallbacks,
   STOCKFISH_WORKER_URL_IMPORT,
   ensureStockfishWorkerUrlResolved
 } from './stockfishWorkerUrlCheck';
@@ -9,6 +10,10 @@ const STOCKFISH_WORKER_ASSET_IMPORT = STOCKFISH_WORKER_URL_IMPORT.replace(
   '?url',
   ''
 );
+const NO_FALLBACKS: ResolutionFallbacks = {
+  resolveModule: () => null,
+  fileExists: async () => false
+};
 
 describe('ensureStockfishWorkerUrlResolved', () => {
   it('uses the Stockfish worker URL import specifier', async () => {
@@ -18,7 +23,7 @@ describe('ensureStockfishWorkerUrlResolved', () => {
       return { id: RESOLVED_ID };
     };
 
-    await ensureStockfishWorkerUrlResolved(resolveId);
+    await ensureStockfishWorkerUrlResolved(resolveId, NO_FALLBACKS);
 
     expect(receivedId).toBe(STOCKFISH_WORKER_URL_IMPORT);
   });
@@ -26,9 +31,9 @@ describe('ensureStockfishWorkerUrlResolved', () => {
   it('throws when the worker URL cannot be resolved', async () => {
     const resolveId = async () => null;
 
-    await expect(ensureStockfishWorkerUrlResolved(resolveId)).rejects.toThrow(
-      /Stockfish worker URL could not be resolved/
-    );
+    await expect(
+      ensureStockfishWorkerUrlResolved(resolveId, NO_FALLBACKS)
+    ).rejects.toThrow(/Stockfish worker URL could not be resolved/);
   });
 
   it('falls back to resolving the asset path without the url query', async () => {
@@ -41,11 +46,35 @@ describe('ensureStockfishWorkerUrlResolved', () => {
       return null;
     };
 
-    await ensureStockfishWorkerUrlResolved(resolveId);
+    await ensureStockfishWorkerUrlResolved(resolveId, NO_FALLBACKS);
 
     expect(receivedIds).toEqual([
       STOCKFISH_WORKER_URL_IMPORT,
       STOCKFISH_WORKER_ASSET_IMPORT
     ]);
+  });
+
+  it('falls back to the node resolver when Vite cannot resolve the asset', async () => {
+    const receivedIds: string[] = [];
+    const receivedModuleIds: string[] = [];
+    const resolveId = async (id: string) => {
+      receivedIds.push(id);
+      return null;
+    };
+    const fallbacks: ResolutionFallbacks = {
+      resolveModule: (id) => {
+        receivedModuleIds.push(id);
+        return `file://${RESOLVED_ID}`;
+      },
+      fileExists: async (path) => path === RESOLVED_ID
+    };
+
+    await ensureStockfishWorkerUrlResolved(resolveId, fallbacks);
+
+    expect(receivedIds).toEqual([
+      STOCKFISH_WORKER_URL_IMPORT,
+      STOCKFISH_WORKER_ASSET_IMPORT
+    ]);
+    expect(receivedModuleIds).toEqual([STOCKFISH_WORKER_ASSET_IMPORT]);
   });
 });
