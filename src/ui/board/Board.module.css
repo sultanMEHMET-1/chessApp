@@ -1,0 +1,180 @@
+:global(:root) {
+  /* Board-specific constants for predictable layout and contrast. */
+  --board-grid-size: 8;
+  --board-max-size: 32rem;
+  --board-border-width: 1px;
+  --board-light-square: #f2d6b3;
+  --board-dark-square: #b67b4d;
+  --board-piece-size: clamp(1.4rem, 2.8vw, 2.6rem);
+  --board-piece-weight: 600;
+  --board-piece-white: #fdf9f4;
+  --board-piece-black: #2b1f16;
+  --board-selection-ring: 3px;
+  --board-selection-color: var(--color-accent);
+  --board-last-move-ring: 3px;
+  --board-last-move-color: rgba(160, 91, 46, 0.35);
+  --board-legal-indicator-size: 42%;
+  --board-legal-indicator-border: 3px;
+  --board-legal-indicator-color: rgba(31, 26, 23, 0.35);
+  --board-focus-ring: 3px;
+  --board-focus-color: rgba(31, 26, 23, 0.5);
+  --board-error-border: #d5a6a6;
+  --board-error-background: #f6e8e8;
+  --board-error-text: #5b1d1d;
+}
+
+.panel {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+.boardWrapper {
+  display: grid;
+  justify-items: center;
+}
+
+.board {
+  width: min(100%, var(--board-max-size));
+  aspect-ratio: 1 / 1;
+  display: grid;
+  grid-template-columns: repeat(var(--board-grid-size), 1fr);
+  grid-template-rows: repeat(var(--board-grid-size), 1fr);
+  border-radius: var(--radius-md);
+  border: var(--board-border-width) solid var(--color-border);
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+.square {
+  position: relative;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: var(--board-piece-size);
+  font-weight: var(--board-piece-weight);
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  line-height: 1;
+  color: var(--color-ink);
+}
+
+.square::before,
+.square::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--board-selection-ring) solid transparent;
+  pointer-events: none;
+}
+
+.square::before {
+  border-width: var(--board-last-move-ring);
+}
+
+.lightSquare {
+  background: var(--board-light-square);
+}
+
+.darkSquare {
+  background: var(--board-dark-square);
+}
+
+.selected::after {
+  border-color: var(--board-selection-color);
+}
+
+.lastMove::before {
+  border-color: var(--board-last-move-color);
+}
+
+.square:focus-visible {
+  outline: var(--board-focus-ring) solid var(--board-focus-color);
+  outline-offset: 0;
+}
+
+.piece {
+  position: relative;
+  z-index: 2;
+  text-transform: uppercase;
+}
+
+.piece[data-color="w"] {
+  color: var(--board-piece-white);
+  text-shadow: 0 1px 2px rgba(43, 31, 22, 0.45);
+}
+
+.piece[data-color="b"] {
+  color: var(--board-piece-black);
+  text-shadow: 0 1px 1px rgba(253, 249, 244, 0.4);
+}
+
+.legalIndicator {
+  position: absolute;
+  width: var(--board-legal-indicator-size);
+  height: var(--board-legal-indicator-size);
+  border-radius: 999px;
+  border: var(--board-legal-indicator-border) solid
+    var(--board-legal-indicator-color);
+  background: transparent;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.statusPanel {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+.statusRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+.statusLabel {
+  color: var(--color-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--font-size-sm);
+}
+
+.statusValue {
+  font-weight: 600;
+}
+
+.fenValue {
+  font-family: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+  font-size: var(--font-size-sm);
+  text-align: right;
+  word-break: break-all;
+  color: var(--color-ink-muted);
+}
+
+.errorBanner {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--board-error-border);
+  background: var(--board-error-background);
+  color: var(--board-error-text);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 40rem) {
+  .statusRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .fenValue {
+    text-align: left;
+  }
+}

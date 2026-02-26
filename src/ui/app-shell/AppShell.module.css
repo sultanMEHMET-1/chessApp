@@ -112,17 +112,6 @@
   gap: var(--space-lg);
 }
 
-.boardPlaceholder {
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-md);
-  border: 1px dashed var(--color-border);
-  background: var(--color-panel);
-  display: grid;
-  place-items: center;
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-base);
-}
-
 .mainMeta {
   padding: var(--space-md);
   border-radius: var(--radius-md);
