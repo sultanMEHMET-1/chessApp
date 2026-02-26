@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ChessState, type MoveInput } from './chessState';
+import { ChessState, type LegalMove, type MoveInput } from './chessState';
 import type { Square } from 'chess.js';
 
 const START_FEN =
@@ -7,17 +7,29 @@ const START_FEN =
 const ILLEGAL_MOVE: MoveInput = { from: 'e2', to: 'e5' };
 const PINNED_ROOK_FEN = 'k3r3/8/8/8/8/8/4R3/4K3 w - - 0 1';
 const PINNED_ROOK_SQUARE: Square = 'e2';
-const PINNED_ILLEGAL_DESTINATION: Square = 'a2';
-const CASTLING_THROUGH_CHECK_FEN = 'r3k2r/8/8/8/2b5/8/8/R3K2R w KQkq - 0 1';
+const PINNED_ROOK_EXPECTED_MOVES = [
+  'e2e3',
+  'e2e4',
+  'e2e5',
+  'e2e6',
+  'e2e7',
+  'e2e8'
+];
+const CASTLING_THROUGH_CHECK_FEN = 'k4r2/8/8/8/8/8/8/4K2R w K - 0 1';
 const CASTLING_KING_SQUARE: Square = 'e1';
-const CASTLING_DESTINATION: Square = 'g1';
+const CASTLING_EXPECTED_MOVES = ['e1d1', 'e1d2', 'e1e2'];
 const EN_PASSANT_EXPOSES_KING_FEN = 'k3r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1';
 const EN_PASSANT_PAWN_SQUARE: Square = 'e5';
-const EN_PASSANT_DESTINATION: Square = 'd6';
+const EN_PASSANT_EXPECTED_MOVES = ['e5e6'];
 const PROMOTION_FEN = '4k3/P7/8/8/8/8/8/4K3 w - - 0 1';
 const PROMOTION_PAWN_SQUARE: Square = 'a7';
-const PROMOTION_DESTINATION: Square = 'a8';
-const EXPECTED_PROMOTION_COUNT = 4;
+const PROMOTION_EXPECTED_MOVES = [
+  'a7a8b',
+  'a7a8n',
+  'a7a8q',
+  'a7a8r'
+];
+const PROMOTION_MOVE_COUNT = PROMOTION_EXPECTED_MOVES.length;
 const THREEFOLD_SEQUENCE: MoveInput[] = [
   { from: 'g1', to: 'f3' },
   { from: 'g8', to: 'f6' },
@@ -40,6 +52,18 @@ function expectMoveOk(state: ChessState, input: MoveInput): void {
   }
 }
 
+function toUciMoves(moves: LegalMove[]): string[] {
+  return moves.map(moveToUci).sort((left, right) => left.localeCompare(right));
+}
+
+function moveToUci(move: LegalMove): string {
+  if (move.promotion) {
+    return `${move.from}${move.to}${move.promotion}`;
+  }
+
+  return `${move.from}${move.to}`;
+}
+
 describe('ChessState', () => {
   it('rejects illegal moves', () => {
     const state = new ChessState();
@@ -50,40 +74,31 @@ describe('ChessState', () => {
 
   it('filters out pseudo-legal moves that expose the king', () => {
     const state = new ChessState(PINNED_ROOK_FEN);
-    const moves = state.legalMovesForSquare(PINNED_ROOK_SQUARE);
-    const destinations = moves.map((move) => move.to);
+    const moves = toUciMoves(state.legalMovesForSquare(PINNED_ROOK_SQUARE));
 
-    expect(destinations).not.toContain(PINNED_ILLEGAL_DESTINATION);
+    expect(moves).toEqual(PINNED_ROOK_EXPECTED_MOVES);
   });
 
   it('disallows castling through check', () => {
     const state = new ChessState(CASTLING_THROUGH_CHECK_FEN);
-    const moves = state.legalMovesForSquare(CASTLING_KING_SQUARE);
-    const destinations = moves.map((move) => move.to);
+    const moves = toUciMoves(state.legalMovesForSquare(CASTLING_KING_SQUARE));
 
-    expect(destinations).not.toContain(CASTLING_DESTINATION);
+    expect(moves).toEqual(CASTLING_EXPECTED_MOVES);
   });
 
   it('disallows en passant that exposes the king', () => {
     const state = new ChessState(EN_PASSANT_EXPOSES_KING_FEN);
-    const moves = state.legalMovesForSquare(EN_PASSANT_PAWN_SQUARE);
-    const destinations = moves.map((move) => move.to);
+    const moves = toUciMoves(state.legalMovesForSquare(EN_PASSANT_PAWN_SQUARE));
 
-    expect(destinations).not.toContain(EN_PASSANT_DESTINATION);
+    expect(moves).toEqual(EN_PASSANT_EXPECTED_MOVES);
   });
 
   it('returns four promotion choices for a pawn on the seventh rank', () => {
     const state = new ChessState(PROMOTION_FEN);
-    const moves = state.legalMovesForSquare(PROMOTION_PAWN_SQUARE);
-    const promotions = moves
-      .filter((move) => move.to === PROMOTION_DESTINATION)
-      .map((move) => move.promotion)
-      .filter((promotion): promotion is NonNullable<typeof promotion> =>
-        Boolean(promotion)
-      );
+    const moves = toUciMoves(state.legalMovesForSquare(PROMOTION_PAWN_SQUARE));
 
-    expect(promotions).toHaveLength(EXPECTED_PROMOTION_COUNT);
-    expect(new Set(promotions)).toEqual(new Set(['q', 'r', 'b', 'n']));
+    expect(moves).toEqual(PROMOTION_EXPECTED_MOVES);
+    expect(moves).toHaveLength(PROMOTION_MOVE_COUNT);
   });
 
   it('detects threefold repetition', () => {
