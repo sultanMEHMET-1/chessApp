@@ -5,6 +5,10 @@ import {
 } from './stockfishWorkerUrlCheck';
 
 const RESOLVED_ID = '/assets/stockfish-worker.js';
+const STOCKFISH_WORKER_ASSET_IMPORT = STOCKFISH_WORKER_URL_IMPORT.replace(
+  '?url',
+  ''
+);
 
 describe('ensureStockfishWorkerUrlResolved', () => {
   it('uses the Stockfish worker URL import specifier', async () => {
@@ -25,5 +29,23 @@ describe('ensureStockfishWorkerUrlResolved', () => {
     await expect(ensureStockfishWorkerUrlResolved(resolveId)).rejects.toThrow(
       /Stockfish worker URL could not be resolved/
     );
+  });
+
+  it('falls back to resolving the asset path without the url query', async () => {
+    const receivedIds: string[] = [];
+    const resolveId = async (id: string) => {
+      receivedIds.push(id);
+      if (id === STOCKFISH_WORKER_ASSET_IMPORT) {
+        return { id: RESOLVED_ID };
+      }
+      return null;
+    };
+
+    await ensureStockfishWorkerUrlResolved(resolveId);
+
+    expect(receivedIds).toEqual([
+      STOCKFISH_WORKER_URL_IMPORT,
+      STOCKFISH_WORKER_ASSET_IMPORT
+    ]);
   });
 });
