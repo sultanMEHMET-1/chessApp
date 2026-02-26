@@ -1,11 +1,22 @@
+/**
+ * Stockfish worker bridge: spawns the engine worker and translates UCI output
+ * into typed messages for the UI layer.
+ */
 import { ENGINE_PROTOCOL_VERSION } from './types';
 import type { AnalysisSettings, EngineRequest, EngineResponse } from './types';
 import { parseUciInfoLine } from './uciParser';
-import stockfishWorkerUrl from 'stockfish/src/stockfish-17.1-lite-single-03e3232.js?url';
+import stockfishEngineScriptUrl from 'stockfish/src/stockfish-17.1-lite-single-03e3232.js?url';
+import stockfishEngineWasmUrl from 'stockfish/src/stockfish-17.1-lite-single-03e3232.wasm?url';
 
 const LINE_PREFIX_INFO = 'info';
 const LINE_PREFIX_BESTMOVE = 'bestmove';
 const LINE_READY = 'uciok';
+const WORKER_HASH_SUFFIX = 'worker';
+
+// Stockfish expects the wasm path via location.hash when running in a worker.
+const stockfishWorkerUrl = `${stockfishEngineScriptUrl}#${encodeURIComponent(
+  stockfishEngineWasmUrl
+)},${WORKER_HASH_SUFFIX}`;
 
 const engineWorker = new Worker(stockfishWorkerUrl, { type: 'classic' });
 let activeRequestId: string | null = null;
