@@ -1,21 +1,25 @@
-import stockfish from 'stockfish';
 import { ENGINE_PROTOCOL_VERSION } from './types';
 import type { AnalysisSettings, EngineRequest, EngineResponse } from './types';
 import { parseUciInfoLine } from './uciParser';
 
-const engine = stockfish();
-let activeRequestId: string | null = null;
-
 const LINE_PREFIX_INFO = 'info';
 const LINE_PREFIX_BESTMOVE = 'bestmove';
 const LINE_READY = 'uciok';
+
+const STOCKFISH_SCRIPT =
+  'stockfish/src/stockfish-17.1-lite-single-03e3232.js';
+
+const stockfishUrl = new URL(STOCKFISH_SCRIPT, import.meta.url);
+
+const engineWorker = new Worker(stockfishUrl, { type: 'classic' });
+let activeRequestId: string | null = null;
 
 function post(response: EngineResponse) {
   self.postMessage(response);
 }
 
 function sendEngine(command: string) {
-  engine.postMessage(command);
+  engineWorker.postMessage(command);
 }
 
 function buildGoCommand(settings: AnalysisSettings): string {
@@ -42,8 +46,8 @@ function stopAnalysis() {
   sendEngine('stop');
 }
 
-engine.onmessage = (event: MessageEvent | string) => {
-  const line = typeof event === 'string' ? event : event.data;
+engineWorker.onmessage = (event: MessageEvent<string>) => {
+  const line = event.data;
   if (typeof line !== 'string') {
     return;
   }
@@ -75,6 +79,14 @@ engine.onmessage = (event: MessageEvent | string) => {
   }
 };
 
+engineWorker.onerror = () => {
+  post({
+    type: 'error',
+    version: ENGINE_PROTOCOL_VERSION,
+    message: 'Stockfish worker failed to start.'
+  });
+};
+
 self.onmessage = (event: MessageEvent<EngineRequest>) => {
   const message = event.data;
   if (message.version !== ENGINE_PROTOCOL_VERSION) {
@@ -103,6 +115,6 @@ self.onmessage = (event: MessageEvent<EngineRequest>) => {
 
   if (message.type === 'quit') {
     stopAnalysis();
-    sendEngine('quit');
+    engineWorker.terminate();
   }
 };

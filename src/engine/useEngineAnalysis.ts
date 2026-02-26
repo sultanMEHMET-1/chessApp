@@ -8,6 +8,9 @@ import type { AnalysisSettings, EngineRequest, EngineResponse } from './types';
 
 const REQUEST_PREFIX = 'analysis';
 const REQUEST_COUNTER_START = 0;
+const WORKER_UNAVAILABLE_MESSAGE = 'Web Workers are not available in this environment.';
+
+const HAS_WORKER_SUPPORT = typeof Worker !== 'undefined';
 
 function buildRequestId(counter: number): string {
   return `${REQUEST_PREFIX}-${counter}`;
@@ -31,6 +34,11 @@ function useEngineAnalysis({ fen, enabled, settings }: UseEngineAnalysisArgs) {
 
   const initializeWorker = useCallback(() => {
     if (workerRef.current) {
+      return;
+    }
+
+    if (!HAS_WORKER_SUPPORT) {
+      dispatch({ type: 'error', message: WORKER_UNAVAILABLE_MESSAGE });
       return;
     }
 

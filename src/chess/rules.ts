@@ -160,13 +160,14 @@ function applyMoveToHistory(
 
 function importPgn(pgn: string, initialFen: string = STARTING_FEN): PgnImportResult {
   const game = createGameFromFen(initialFen);
-  const ok = game.loadPgn(pgn, { strict: true });
-  if (!ok) {
+  try {
+    game.loadPgn(pgn, { strict: true });
+  } catch (error) {
     return {
       moves: [],
       san: [],
       fen: initialFen,
-      error: 'Invalid PGN input.'
+      error: error instanceof Error ? error.message : 'Invalid PGN input.'
     };
   }
   const snapshot = buildHistorySnapshot(game);

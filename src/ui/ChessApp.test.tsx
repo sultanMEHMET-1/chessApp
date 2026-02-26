@@ -6,7 +6,7 @@ const START_PAWN_SQUARE = 'square-e2';
 const LEGAL_DESTINATIONS = ['square-e3', 'square-e4'];
 const EXPECTED_DESTINATION_COUNT = 2;
 const EXPECTED_FEN_AFTER_E4 =
-  'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1';
+  'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
 
 describe('ChessApp integration', () => {
   it('shows exactly the legal destinations for a selected piece', () => {
