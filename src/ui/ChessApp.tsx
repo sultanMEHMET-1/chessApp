@@ -262,6 +262,7 @@ function ChessApp({ initialFen = DEFAULT_STARTING_FEN }: ChessAppProps) {
               lines={analysis.lines}
               status={analysis.status}
               error={analysis.error}
+              requestId={analysis.requestId}
               onToggle={setAnalysisEnabled}
               onModeChange={setAnalysisMode}
               onValueChange={handleAnalysisValueChange}

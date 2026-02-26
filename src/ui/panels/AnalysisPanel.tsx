@@ -4,6 +4,7 @@ import styles from './AnalysisPanel.module.css';
 const CENTIPAWN_SCALE = 100; // Convert centipawns to pawn units.
 const PAWN_DECIMALS = 2; // Show two decimals for evaluation.
 const MIN_ANALYSIS_VALUE = 1; // Analysis settings must be positive.
+const REQUEST_ID_IDLE = 'idle'; // Placeholder when analysis is not running.
 
 const ANALYSIS_MODES: Array<{ value: AnalysisMode; label: string }> = [
   { value: 'depth', label: 'Depth' },
@@ -18,6 +19,7 @@ type AnalysisPanelProps = {
   lines: AnalysisLine[];
   status: 'idle' | 'running' | 'error';
   error?: string;
+  requestId: string | null;
   onToggle: (enabled: boolean) => void;
   onModeChange: (mode: AnalysisMode) => void;
   onValueChange: (value: number) => void;
@@ -40,13 +42,18 @@ function AnalysisPanel({
   lines,
   status,
   error,
+  requestId,
   onToggle,
   onModeChange,
   onValueChange,
   onRestart
 }: AnalysisPanelProps) {
   return (
-    <div className={styles.panel}>
+    <div
+      className={styles.panel}
+      data-testid="analysis-panel"
+      data-request-id={requestId ?? REQUEST_ID_IDLE}
+    >
       <div className={styles.controls}>
         <button
           type="button"
