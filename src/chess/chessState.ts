@@ -15,6 +15,7 @@ const FEN_FIELD_SEPARATOR = /\s+/;
 const EMPTY_PGN_MESSAGE = 'Paste a PGN to import.';
 const INVALID_PGN_MESSAGE =
   'PGN could not be parsed. Check move text like "1. e4 e5".';
+const PROMOTION_PIECES: PromotionPiece[] = ['q', 'r', 'b', 'n'];
 
 export type PromotionPiece = 'q' | 'r' | 'b' | 'n';
 
@@ -106,7 +107,7 @@ export class ChessState {
   }
 
   getPiece(square: Square): BoardPiece | null {
-    return this.chess.get(square);
+    return this.chess.get(square) ?? null;
   }
 
   isInCheck(): boolean {
@@ -179,12 +180,12 @@ export class ChessState {
       };
     }
 
-    const loaded = this.chess.load(trimmed);
-
-    if (!loaded) {
+    try {
+      this.chess.load(trimmed);
+    } catch (error) {
       return {
         ok: false,
-        error: `Invalid FEN: ${trimmed}`
+        error: error instanceof Error ? error.message : `Invalid FEN: ${trimmed}`
       };
     }
 
@@ -218,7 +219,7 @@ export class ChessState {
     const history = candidate
       .history({ verbose: true })
       .map(toMoveRecord);
-    const startFen = history.length > 0 ? history[0].before : candidate.fen();
+    const startFen = history[0]?.before ?? candidate.fen();
     const finalFen = candidate.fen();
 
     this.chess.loadPgn(trimmed);
@@ -242,7 +243,7 @@ function toLegalMove(move: Move): LegalMove {
     piece: move.piece,
     color: move.color,
     captured: move.captured,
-    promotion: move.promotion,
+    promotion: toPromotionPiece(move.promotion),
     san: move.san,
     lan: move.lan,
     isCapture: move.isCapture(),
@@ -252,6 +253,18 @@ function toLegalMove(move: Move): LegalMove {
     isQueensideCastle,
     isCastle: isKingsideCastle || isQueensideCastle
   };
+}
+
+function toPromotionPiece(
+  promotion: PieceSymbol | undefined
+): PromotionPiece | undefined {
+  if (!promotion) {
+    return undefined;
+  }
+
+  return PROMOTION_PIECES.includes(promotion as PromotionPiece)
+    ? (promotion as PromotionPiece)
+    : undefined;
 }
 
 function toMoveRecord(move: Move): MoveRecord {
