@@ -96,7 +96,12 @@ describe('rules engine draw detection', () => {
 
 describe('rules engine history and PGN', () => {
   it('builds history state when applying moves', () => {
-    const snapshot = applyMoveToHistory(STARTING_FEN, [], SIMPLE_GAME_MOVES[0]);
+    const firstMove = SIMPLE_GAME_MOVES[0];
+    if (!firstMove) {
+      throw new Error('Expected at least one move in SIMPLE_GAME_MOVES.');
+    }
+
+    const snapshot = applyMoveToHistory(STARTING_FEN, [], firstMove);
 
     expect(snapshot).not.toBeNull();
     expect(snapshot?.moves).toHaveLength(1);

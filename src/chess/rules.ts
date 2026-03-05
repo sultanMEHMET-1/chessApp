@@ -124,12 +124,13 @@ function getSanHistoryFromHistory(initialFen: string, moves: MoveSelection[]): s
 function buildHistorySnapshot(game: Chess): HistorySnapshot {
   const history = game.history({ verbose: true }).map((move) => toMoveSelection(move));
   const san = game.history();
-  const lastMove = history.length
+  const lastHistoryMove = history.at(-1);
+  const lastMove = lastHistoryMove
     ? {
-        from: history[history.length - 1].from,
-        to: history[history.length - 1].to,
-        san: san[san.length - 1] ?? '',
-        promotion: history[history.length - 1].promotion
+        from: lastHistoryMove.from,
+        to: lastHistoryMove.to,
+        san: san.at(-1) ?? '',
+        promotion: lastHistoryMove.promotion
       }
     : undefined;
 
@@ -221,7 +222,12 @@ function normalizePromotionSelection(moves: LegalMove[], to: Square): MoveSelect
     (move) => move.promotion === PROMOTION_DEFAULT
   );
 
-  const move = preferredPromotion ?? candidateMoves[0];
+  const fallbackMove = candidateMoves[0];
+  if (!fallbackMove) {
+    return null;
+  }
+
+  const move = preferredPromotion ?? fallbackMove;
   return {
     from: move.from,
     to: move.to,
