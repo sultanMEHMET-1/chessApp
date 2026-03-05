@@ -106,7 +106,7 @@ export class ChessState {
   }
 
   getPiece(square: Square): BoardPiece | null {
-    return this.chess.get(square);
+    return this.chess.get(square) ?? null;
   }
 
   isInCheck(): boolean {
@@ -179,9 +179,9 @@ export class ChessState {
       };
     }
 
-    const loaded = this.chess.load(trimmed);
-
-    if (!loaded) {
+    try {
+      this.chess.load(trimmed);
+    } catch {
       return {
         ok: false,
         error: `Invalid FEN: ${trimmed}`
@@ -218,7 +218,8 @@ export class ChessState {
     const history = candidate
       .history({ verbose: true })
       .map(toMoveRecord);
-    const startFen = history.length > 0 ? history[0].before : candidate.fen();
+    const firstMove = history.at(0);
+    const startFen = firstMove ? firstMove.before : candidate.fen();
     const finalFen = candidate.fen();
 
     this.chess.loadPgn(trimmed);
@@ -242,7 +243,7 @@ function toLegalMove(move: Move): LegalMove {
     piece: move.piece,
     color: move.color,
     captured: move.captured,
-    promotion: move.promotion,
+    promotion: normalizePromotion(move.promotion),
     san: move.san,
     lan: move.lan,
     isCapture: move.isCapture(),
@@ -260,6 +261,20 @@ function toMoveRecord(move: Move): MoveRecord {
     before: move.before,
     after: move.after
   };
+}
+
+function normalizePromotion(
+  promotion: PieceSymbol | undefined
+): PromotionPiece | undefined {
+  switch (promotion) {
+    case 'q':
+    case 'r':
+    case 'b':
+    case 'n':
+      return promotion;
+    default:
+      return undefined;
+  }
 }
 
 function parseHalfMoveClock(fen: string): number {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ChessState } from './chessState';
+import { ChessState, type MoveInput } from './chessState';
 import { applyMove, getLegalDestinations } from './selection';
 import type { Square } from 'chess.js';
 
@@ -8,7 +8,7 @@ const START_FEN =
 const EXPECTED_KNIGHT_SQUARE: Square = 'b1';
 const EXPECTED_KNIGHT_DESTINATIONS: Square[] = ['a3', 'c3'];
 const EXPECTED_KNIGHT_DESTINATION_COUNT = 2;
-const OPENING_MOVE = { from: 'e2', to: 'e4' };
+const OPENING_MOVE: MoveInput = { from: 'e2', to: 'e4' };
 const EXPECTED_FEN_AFTER_E4 =
   'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1';
 const EXPECTED_HISTORY_LENGTH = 1;
@@ -45,7 +45,11 @@ describe('ChessState integration', () => {
 
     const history = state.getHistory();
     expect(history).toHaveLength(EXPECTED_HISTORY_LENGTH);
-    expect(history[0].before).toBe(START_FEN);
-    expect(history[0].after).toBe(EXPECTED_FEN_AFTER_E4);
+    const firstMove = history[0];
+    if (!firstMove) {
+      throw new Error('Expected move history to contain the opening move.');
+    }
+    expect(firstMove.before).toBe(START_FEN);
+    expect(firstMove.after).toBe(EXPECTED_FEN_AFTER_E4);
   });
 });

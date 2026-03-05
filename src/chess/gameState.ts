@@ -50,11 +50,15 @@ function getLastMove(timeline: GameTimeline): LastMove | undefined {
     return undefined;
   }
   const index = timeline.currentPly - 1;
+  const move = timeline.moves[index];
+  if (!move) {
+    return undefined;
+  }
   return {
-    from: timeline.moves[index].from,
-    to: timeline.moves[index].to,
+    from: move.from,
+    to: move.to,
     san: timeline.san[index] ?? '',
-    promotion: timeline.moves[index].promotion
+    promotion: move.promotion
   };
 }
 
